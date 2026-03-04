@@ -1,0 +1,7 @@
+streamlit
+    psycopg
+    pymupdf
+    openai
+    python-dotenv
+    pgvector
+    pandas
