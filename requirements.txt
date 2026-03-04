@@ -1,5 +1,5 @@
 streamlit
-    psycopg
+    psycopg[binary]
     pymupdf
     openai
     python-dotenv
