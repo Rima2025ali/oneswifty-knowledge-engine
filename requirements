@@ -1,4 +1,0 @@
-streamlit
-psycopg[binary]
-openai
-langchain
