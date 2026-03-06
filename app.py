@@ -130,6 +130,8 @@ with st.container():
                 with get_connection() as conn:
                     with conn.cursor() as cur:
                         for i, page in enumerate(doc):
+                            progress_bar.progress((i + 1) / total_pages)
+                            status_text.text(f"Processing page {i+1}...")
                             text = page.get_text()
                             if len(text.strip()) > 50:
                                 vec = get_embedding(text[:2500])
