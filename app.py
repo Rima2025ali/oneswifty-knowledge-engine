@@ -148,7 +148,7 @@ with st.container():
                                     
                                     raw_chunk = text[start:end].strip()
                                     clean_chunk = raw_chunk.replace("\x00", "").strip()
-                                    if len(clean_chunk) > 20:
+                                if len(clean_chunk) > 20:
                                     # Generate embedding from the clean text
                                     vec = get_embedding(clean_chunk)
                                   
