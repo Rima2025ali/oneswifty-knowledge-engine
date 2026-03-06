@@ -59,7 +59,8 @@ def send_budget_alert(current_spend):
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(sender_email, password)
             server.sendmail(sender_email, USER_EMAIL, msg.as_string())
-    except Exception as e: print(f"Email failed: {e}")
+    except Exception as e:
+        print(f"Email failed: {e}")
 
 def get_total_spend_today():
     log_file = "oneswifty_audit_log.csv"
@@ -87,7 +88,7 @@ st.title("🚀 OneSwifty: Knowledge Engine [BETA]")
 current_spend = get_total_spend_today()
 is_over_budget = current_spend >= DAILY_BUDGET_LIMIT
 
-# Budget Alerts
+# Budget Alerts Logic
 if current_spend >= (DAILY_BUDGET_LIMIT * ALERT_THRESHOLD) and not is_over_budget:
     if 'alert_sent' not in st.session_state:
         send_budget_alert(current_spend)
@@ -101,20 +102,19 @@ with st.container():
         if st.button("🚀 Start AI Ingestion", use_container_width=True, disabled=is_over_budget):
             if uploaded_file:
                 doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+                first_page_sample = doc[0].get_text()[:2000]
+                
                 with st.spinner("AI analyzing document..."):
-                 # Updated prompt for better document identity extraction
-                 meta_response = client.chat.completions.create(
-                  model="gpt-4o-mini",
-                   messages=[
-                     {"role": "system", "content": """You are an expert technical librarian. 
-                      Focus on identifying the PRIMARY TITLE and the INSTITUTIONAL AUTHOR (e.g., Office of Management and Budget) 
-                     if a human author is not present. Ignore file names and technical watermarks.
-                      Return ONLY in this format: Title | Author | Category"""},
-                      {"role": "user", "content": first_page_sample}
-                       ]
+                    meta_response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "You are a technical librarian. Extract Title | Institutional Author | Category. Ignore file names."},
+                            {"role": "user", "content": first_page_sample}
+                        ]
                     )
                     try:
-                        title, author, cat = meta.choices[0].message.content.split("|")
+                        res_text = meta_response.choices[0].message.content
+                        title, author, cat = res_text.split("|")
                     except:
                         title, author, cat = uploaded_file.name, "Unknown", "General"
                 
@@ -122,17 +122,18 @@ with st.container():
                     with conn.cursor() as cur:
                         for i, page in enumerate(doc):
                             text = page.get_text()
-                            vec = get_embedding(text[:2000]) # Simplified for speed
-                            cur.execute("""INSERT INTO oneswifty_knowledge 
-                                        (category, content_text, metadata_source, author, title, page_number, embedding)
-                                        VALUES (%s, %s, %s, %s, %s, %s, %s)""", 
-                                        (cat.strip(), text, uploaded_file.name, author.strip(), title.strip(), i+1, vec))
-                    conn.commit()
+                            if len(text.strip()) > 50:
+                                vec = get_embedding(text[:2500])
+                                cur.execute("""INSERT INTO oneswifty_knowledge 
+                                            (category, content_text, metadata_source, author, title, page_number, embedding)
+                                            VALUES (%s, %s, %s, %s, %s, %s, %s)""", 
+                                            (cat.strip(), text, uploaded_file.name, author.strip(), title.strip(), i+1, vec))
+                        conn.commit()
                 st.success(f"✅ Ingested: {title}")
 
 st.divider()
 
-# --- STEP 2: LIBRARY KNOWLEDGE (THIS WAS MISSING) ---
+# --- STEP 2: LIBRARY KNOWLEDGE ---
 st.subheader("📊 Step 2: Current Library Knowledge")
 conn = get_connection()
 if conn:
@@ -150,24 +151,25 @@ st.divider()
 
 # --- STEP 3: SEARCH ---
 if is_over_budget:
-    st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
+    st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled until tomorrow.")
 else:
     st.subheader("🔍 Step 3: Intelligent Search")
     query = st.chat_input("What would you like to ask about the uploaded files?")
     if query:
         st.chat_message("user").write(query)
-        with st.spinner("Searching..."):
+        with st.spinner("OneSwifty is auditing documents..."):
             query_vec = get_embedding(query)
             conn = get_connection()
             if conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT content_text, title, 1 - (embedding <=> %s::vector) AS sim, page_number FROM oneswifty_knowledge ORDER BY sim DESC LIMIT 5", (query_vec,))
+                    cur.execute("""SELECT content_text, title, 1 - (embedding <=> %s::vector) AS sim, page_number 
+                                FROM oneswifty_knowledge ORDER BY sim DESC LIMIT 5""", (query_vec,))
                     results = cur.fetchall()
                     if results:
                         context = "\n".join([f"Source: {r[1]} P.{r[3]}: {r[0]}" for r in results])
                         resp = client.chat.completions.create(
                             model="gpt-4o",
-                            messages=[{"role": "system", "content": "You are OneSwifty AI. Cite sources."},
+                            messages=[{"role": "system", "content": "You are OneSwifty AI. Cite Page and Title for facts."},
                                       {"role": "user", "content": f"Context: {context}\n\nQuestion: {query}"}]
                         )
                         st.chat_message("assistant").write(resp.choices[0].message.content)
@@ -176,10 +178,17 @@ else:
 
 # --- SIDEBAR ADMIN ---
 with st.sidebar:
+    st.header("🔐 Admin Controls")
     admin_input = st.text_input("Admin Key", type="password")
     if admin_input == ADMIN_KEY:
         st.metric("Today's Spend", f"${current_spend:.4f}")
         st.progress(min(current_spend / DAILY_BUDGET_LIMIT, 1.0))
         if st.button("🗑️ Wipe Database"):
-            # Database clear logic
-            pass
+            conn = get_connection()
+            if conn:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM oneswifty_knowledge")
+                    conn.commit()
+                st.warning("Database Cleared.")
+                conn.close()
+                st.rerun()
