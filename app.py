@@ -62,8 +62,9 @@ def log_query(query, answer, confidence):
         writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), query, answer, f"{confidence*100:.2f}%"])
 
 # --- MAIN INTERFACE START ---
+st.title("🚀 OneSwifty: Knowledge Engine [BETA]")
+st.sidebar.warning("⚠️ This product is currently in testing and under active enhancement.")
 
-st.title("🚀 OneSwifty: Universal Knowledge Engine")
 st.markdown("### High-Precision Scientific & Financial Auditing")
 
 # --- STEP 1: INSTRUCTIONS & INGESTION (Center Stage for Mobile) ---
