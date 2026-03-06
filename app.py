@@ -117,7 +117,7 @@ with st.container():
                     meta_response = client.chat.completions.create(
                         model="gpt-4o-mini",
                         messages=[
-                            {"role": "system", "content": "You are a technical librarian. Extract Title | Institutional Author | Category. Ignore file names."},
+                            {"role": "system", "content": "Extract Title | Authors | Category"},
                             {"role": "user", "content": first_page_sample}
                         ]
                     )
@@ -135,11 +135,13 @@ with st.container():
                             text = page.get_text()
                             if len(text.strip()) > 50:
                                 vec = get_embedding(text[:2500])
-                                cur.execute("""INSERT INTO oneswifty_knowledge 
-                                            (category, content_text, metadata_source, author, title, page_number, embedding)
-                                            VALUES (%s, %s, %s, %s, %s, %s, %s)""", 
-                                            (cat.strip(), text, uploaded_file.name, author.strip(), title.strip(), i+1, vec))
-                        conn.commit()
+                                cur.execute("""
+                                        INSERT INTO oneswifty_knowledge 
+                                        (category, content_text, metadata_source, author, title, page_number, embedding)
+                                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                    """, (auto_category.strip(), chunk, uploaded_file.name, auto_author.strip(), auto_title.strip(), i + 1, vec))
+                                start = end - overlap if (end - overlap) > start else end + 1
+                            conn.commit()
                 st.success(f"✅ Ingested: {title}")
 
 st.divider()
