@@ -85,7 +85,7 @@ def log_query(query, answer, confidence, in_t, out_t):
 # --- MAIN INTERFACE ---
 st.title("🚀 OneSwifty: Knowledge Engine [BETA]")
 
-# --- NEW: RESTORED INSTRUCTIONS SECTION ---
+# --- INSTRUCTIONS ---
 st.markdown("""
 ### 📖 How to use OneSwifty:
 1.  **Ingest Knowledge**: Use the expander below to upload a PDF. This trains the AI on your specific document.
@@ -110,39 +110,55 @@ with st.container():
         uploaded_file = st.file_uploader("Upload PDF", type="pdf", label_visibility="collapsed")
         if st.button("🚀 Start AI Ingestion", use_container_width=True, disabled=is_over_budget):
             if uploaded_file:
+                # Initialize UI elements for feedback
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
                 doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+                total_pages = len(doc)
                 first_page_sample = doc[0].get_text()[:2000]
                 
                 with st.spinner("AI analyzing document identity..."):
                     meta_response = client.chat.completions.create(
                         model="gpt-4o-mini",
                         messages=[
-                            {"role": "system", "content": "Extract Title | Authors | Category"},
+                            {"role": "system", "content": "You are a technical librarian. Extract Title | Institutional Author | Category. Ignore file names."},
                             {"role": "user", "content": first_page_sample}
                         ]
                     )
                     try:
                         res_text = meta_response.choices[0].message.content
-                        title, author, cat = res_text.split("|")
+                        auto_title, auto_author, auto_category = res_text.split("|")
                     except:
-                        title, author, cat = uploaded_file.name, "Unknown", "General"
+                        auto_title, auto_author, auto_category = uploaded_file.name, "Unknown", "General"
                 
                 with get_connection() as conn:
                     with conn.cursor() as cur:
                         for i, page in enumerate(doc):
+                            # Update Progress
                             progress_bar.progress((i + 1) / total_pages)
-                            status_text.text(f"Processing page {i+1}...")
+                            status_text.text(f"Processing page {i+1} of {total_pages}...")
+                            
                             text = page.get_text()
                             if len(text.strip()) > 50:
-                                vec = get_embedding(text[:2500])
-                                cur.execute("""
+                                # Chunking logic
+                                chunk_size, overlap, start = 1000, 100, 0
+                                while start < len(text):
+                                    end = min(start + chunk_size, len(text))
+                                    chunk = text[start:end].strip()
+                                    
+                                    vec = get_embedding(chunk)
+                                    cur.execute("""
                                         INSERT INTO oneswifty_knowledge 
                                         (category, content_text, metadata_source, author, title, page_number, embedding)
                                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                                     """, (auto_category.strip(), chunk, uploaded_file.name, auto_author.strip(), auto_title.strip(), i + 1, vec))
-                                start = end - overlap if (end - overlap) > start else end + 1
-                            conn.commit()
-                st.success(f"✅ Ingested: {title}")
+                                    
+                                    start = end - overlap if (end - overlap) > start else end + 1
+                        conn.commit()
+                st.success(f"✅ Ingested: {auto_title}")
+            else:
+                st.error("⚠️ Please upload a file first.")
 
 st.divider()
 
