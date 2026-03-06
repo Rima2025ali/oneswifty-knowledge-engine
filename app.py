@@ -102,16 +102,16 @@ with st.container():
             if uploaded_file:
                 doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
                 with st.spinner("AI analyzing document..."):
-                    # Updated prompt for better document identity extraction
-                meta_response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": """You are an expert technical librarian. 
-                        Focus on identifying the PRIMARY TITLE and the INSTITUTIONAL AUTHOR (e.g., Office of Management and Budget) 
-                        if a human author is not present. Ignore file names and technical watermarks.
-                        Return ONLY in this format: Title | Author | Category"""},
-                        {"role": "user", "content": first_page_sample}
-                        ]
+                 # Updated prompt for better document identity extraction
+                 meta_response = client.chat.completions.create(
+                  model="gpt-4o-mini",
+                   messages=[
+                     {"role": "system", "content": """You are an expert technical librarian. 
+                      Focus on identifying the PRIMARY TITLE and the INSTITUTIONAL AUTHOR (e.g., Office of Management and Budget) 
+                     if a human author is not present. Ignore file names and technical watermarks.
+                      Return ONLY in this format: Title | Author | Category"""},
+                      {"role": "user", "content": first_page_sample}
+                       ]
                     )
                     try:
                         title, author, cat = meta.choices[0].message.content.split("|")
