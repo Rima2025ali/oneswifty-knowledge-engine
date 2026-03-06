@@ -145,9 +145,13 @@ with st.container():
                                 chunk_size, overlap, start = 1000, 100, 0
                                 while start < len(text):
                                     end = min(start + chunk_size, len(text))
-                                    chunk = text[start:end].strip()
                                     
-                                    vec = get_embedding(chunk)
+                                    raw_chunk = text[start:end].strip()
+                                    clean_chunk = raw_chunk.replace("\x00", "").strip()
+                                    if len(clean_chunk) > 20:
+                                    # Generate embedding from the clean text
+                                    vec = get_embedding(clean_chunk)
+                                  
                                     cur.execute("""
                                         INSERT INTO oneswifty_knowledge 
                                         (category, content_text, metadata_source, author, title, page_number, embedding)
