@@ -85,6 +85,15 @@ def log_query(query, answer, confidence, in_t, out_t):
 # --- MAIN INTERFACE ---
 st.title("🚀 OneSwifty: Knowledge Engine [BETA]")
 
+# --- NEW: RESTORED INSTRUCTIONS SECTION ---
+st.markdown("""
+### 📖 How to use OneSwifty:
+1.  **Ingest Knowledge**: Use the expander below to upload a PDF. This trains the AI on your specific document.
+2.  **Verify Library**: Check the table in Step 2 to ensure your document was processed correctly.
+3.  **Search & Audit**: Use the search bar at the bottom to ask technical questions. OneSwifty will cite specific pages and titles for every answer.
+---
+""")
+
 current_spend = get_total_spend_today()
 is_over_budget = current_spend >= DAILY_BUDGET_LIMIT
 
@@ -104,7 +113,7 @@ with st.container():
                 doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
                 first_page_sample = doc[0].get_text()[:2000]
                 
-                with st.spinner("AI analyzing document..."):
+                with st.spinner("AI analyzing document identity..."):
                     meta_response = client.chat.completions.create(
                         model="gpt-4o-mini",
                         messages=[
