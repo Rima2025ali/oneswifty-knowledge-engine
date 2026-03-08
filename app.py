@@ -41,7 +41,8 @@ def get_connection():
         return None
 
 def get_embedding(text):
-    """Generates high-precision vectors using OpenAI's 'large' model (3,072 dims)."""
+ #   """Generates high-precision vectors using OpenAI's 'large' model (3,072 dims)."""
+    """Generates high-precision vectors using OpenAI's 'large' model."""
     text = text.replace("\n", " ")
     response = client.embeddings.create(
         input=[text],
