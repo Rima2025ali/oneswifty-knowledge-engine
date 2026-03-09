@@ -179,8 +179,8 @@ if conn:
 st.divider()
 
 import re
+import streamlit as st
 
-import re
 
 def render_scientific_audit(text):
     """
@@ -215,24 +215,6 @@ def render_scientific_audit(text):
         st.markdown("### 🔬 OneSwifty Scientific Audit")
         st.markdown(text)
         
-import re
-import streamlit as st
-
-
-   def render_scientific_audit(text):
-    # Ensure the subscript {NL} and {E} are always escaped correctly for KaTeX
-    text = text.replace(r"\mu_{NL}", r"$\mu_{\text{NL}}$")
-    text = text.replace(r"\delta E", r"$\delta_E$")
-    text = text.replace(r"\delta_E", r"$\delta_E$")
-    
-    # Add a CSS-styled border for that 'OneSwifty' branding
-    with st.container(border=True):
-        st.markdown("### 🔬 OneSwifty Scientific Audit: MG vs GR")
-        st.markdown(text)
-        st.caption("🔍 Precision Audit based on Moretti et al. (2023)")
-
-
-
 
 def extract_key_findings(text):
     """
@@ -332,7 +314,7 @@ else:
                         with st.chat_message("assistant"):
                         if answer:
                         
-                        render_scientific_audit(answer) 
+                        extract_key_findings(answer) 
                         # Then show the full detailed audit in the border box
                         render_scientific_audit(answer)                        
                         
