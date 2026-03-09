@@ -201,7 +201,7 @@ else:
                         
                         resp = client.chat.completions.create(
                             model="gpt-4o",
-                           messages=[
+                          messages=[
         {
             "role": "system", 
             "content": """You are OneSwifty AI, a high-precision Scientific Auditor. 
@@ -220,7 +220,7 @@ else:
             - Correct Form: $$(R_V/R)^3 = \\frac{32\\pi}{3} G \\beta^2 \\lambda^2 \\bar{\rho}_m \\delta_v$$
             - If the context provides a specific numeric bound (e.g., delta_min), include it exactly."""
         },
-                                {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
+        {"role": "user", "content": f"Context:\n{context_text}\n\nQuestion: {query}"}
                             ]
                         )
                         
