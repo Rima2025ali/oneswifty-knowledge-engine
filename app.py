@@ -182,14 +182,17 @@ import re
 
 # Helper function to prevent Unicode/LaTeX double-rendering
 def render_scientific_text(text):
-    # Standardize Greek letters to LaTeX if they aren't already wrapped
+    # Fix the specific (\mu_NL) or (delta_E) issue by converting (...) to $...$
+    # This regex looks for ( followed by a backslash and text, then )
+    text = re.sub(r'\((?=\\)', '$', text) 
+    text = re.sub(r'(?<=\\.*)\)', '$', text)
+    
+    # Standardize remaining symbols
     symbols = ['μ', 'δ', 'α', 'ρ', 'π']
     for sym in symbols:
         text = re.sub(rf'(?<!\$){sym}(?!\$)', f'${sym}$', text)
-    # Fix common specific artifacts
-    text = text.replace('μNL', r'$\mu_{NL}$')
+    
     st.markdown(text)
-
 import re
 
 # Helper function to prevent Unicode/LaTeX double-rendering
@@ -236,6 +239,13 @@ else:
                                     2. LATEX ONLY: Never use Unicode Greek characters (μ, δ). Always use $\mu$, $\delta$.
                                     3. NO BRACKETS: Never use \[ \] or \( \).
                                     4. VAINSHTEIN: Correct form is $$(R_V/R)^3 = \frac{32\pi}{3} G \beta^2 \lambda^2 \bar{\rho}_m \delta_v$$
+                                    STRICT FORMATTING RULES:
+                                    1. INLINE MATH: You MUST use single dollar signs for all variables. 
+                                       - WRONG: (\mu_{NL}) or (delta_E)
+                                       - RIGHT: $\mu_{NL}$ or $\delta_E$
+                                    2. STANDALONE MATH: Use double dollar signs: $$ [Formula] $$
+                                    3. NO PARENTHESES FOR MATH: Never wrap LaTeX in standard brackets or parentheses.
+                                    4. SYMBOL ACCURACY: Ensure \mu_{NL} is used for non-linear coupling and \delta_E for overdensity.
                                     """
                                 },
                                 {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
