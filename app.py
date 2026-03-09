@@ -180,41 +180,36 @@ st.divider()
 
 import re
 
-def bulletproof_latex_render(text):
+def render_scientific_audit(text):
     """
-    Forcibly converts academic style (\LaTeX) or (variable) 
-    into Streamlit-friendly $LaTeX$ or $variable$.
+    Cleans LaTeX and renders the answer inside a high-precision Auditor box.
     """
-    # 1. Handle the (\mu_NL) or (\delta_E) case specifically
-    # Looks for '(' followed by '\' and eventually ')'
-    text = re.sub(r'\((?=\\)(.*?)\)', r'$\1$', text)
+    # 1. FIX PARENTHESES MATH: ( \mu_NL ) -> $ \mu_NL $
+    # This regex is more robust for academic-style outputs
+    text = re.sub(r'\((?=\s?\\)(.*?)\)', r'$\1$', text)
     
-    # 2. Handle cases where it didn't use a backslash but meant math, e.g., (delta_E)
-    # We look for common physics variables inside parentheses
+    # 2. FIX PLAIN TEXT VARIABLES: (delta_E) -> $\delta_E$
     physics_vars = ['delta', 'mu', 'alpha', 'rho', 'pi', 'beta', 'lambda', 'gamma']
     for var in physics_vars:
+        # Matches (delta_E) or (delta)
         text = re.sub(rf'\({var}(.*?)\)', rf'$\\{var}\1$', text)
 
-    # 3. Clean up any lingering Unicode Greek that escaped
+    # 3. FIX REMAINING UNICODE: μ -> $\mu$
     unicode_map = {'μ': r'\mu', 'δ': r'\delta', 'α': r'\alpha', 'ρ': r'\rho'}
     for char, latex in unicode_map.items():
-        text = text.replace(char, f"${latex}$")
+        # Only replace if not already in a LaTeX block
+        text = re.sub(rf'(?<!\$){char}(?!\$)', f'${latex}$', text)
 
-    # 4. Final Render
-    st.markdown(text)
-
-
- import re
-
-# Helper function to prevent Unicode/LaTeX double-rendering
- def render_scientific_text(text):
-    # Standardize Greek letters to LaTeX if they aren't already wrapped
-     symbols = ['μ', 'δ', 'α', 'ρ', 'π']
-     for sym in symbols:
-        text = re.sub(rf'(?<!\$){sym}(?!\$)', f'${sym}$', text)
-        Fix common specific artifacts
-        text = text.replace('μNL', r'$\mu_{NL}$')
+    # 4. FINAL RENDER IN A BOX
+    # Using st.info for a professional 'Auditor' look
+    with st.container(border=True):
+        st.markdown("### 🔬 Scientific Audit Result")
         st.markdown(text)
+
+# --- USAGE ---
+with st.chat_message("assistant"):
+    if answer:
+        render_scientific_audit(answer)
 
 # --- STEP 3: SEARCH (FORCE LaTeX & SOURCE MAP) ---
 if is_over_budget:
@@ -282,10 +277,10 @@ else:
                                 source_data["Similarity"] = source_data["Similarity"].apply(lambda x: f"{x*100:.1f}%")
                                 st.table(source_data[["Document", "Page", "Similarity"]])
 
-                        # --- RENDER CHAT ANSWER ---
                         with st.chat_message("assistant"):
-                            if answer:
-                            bulletproof_latex_render(answer)
+                        if answer:
+       
+                        render_scientific_audit(answer)
                         
                         log_query(query, answer, 0.9, resp.usage.prompt_tokens, resp.usage.completion_tokens)
                 conn.close()
