@@ -178,7 +178,7 @@ if conn:
 
 st.divider()
 
-# --- STEP 3: SEARCH (RESTORED AUDIT RULES) ---
+# --- STEP 3: SEARCH (REFINED FOR EQUATION 3.22) ---
 if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
 else:
@@ -186,37 +186,53 @@ else:
     query = st.chat_input("What would you like to ask about the uploaded files?")
     if query:
         st.chat_message("user").write(query)
-        with st.spinner("OneSwifty is auditing documents..."):
+        with st.spinner("OneSwifty is performing multi-page synthesis..."):
             query_vec = get_embedding(query)
             conn = get_connection()
             if conn:
                 with conn.cursor() as cur:
-                    cur.execute("""SELECT content_text, title, 1 - (embedding <=> %s::vector) AS sim, page_number, author 
-                                FROM oneswifty_knowledge ORDER BY sim DESC LIMIT 7""", (query_vec,))
+                    cur.execute("""SELECT content_text, title, 1 - (embedding <=> %s::vector) AS sim, page_number 
+                                FROM oneswifty_knowledge ORDER BY sim DESC LIMIT 5""", (query_vec,))
                     results = cur.fetchall()
                     if results:
-                        context = "\n".join([f"Source: {r[1]} P.{r[3]} Author: {r[4]}: {r[0]}" for r in results])
+                        context = "\n\n".join([f"DOC: {r[1]} | PAGE: {r[3]} | CONTENT: {r[0]}" for r in results])
+                        
+                        # REFINED SYSTEM PROMPT
                         resp = client.chat.completions.create(
                             model="gpt-4o",
-                            messages=[{"role": "system", "content": """You are OneSwifty AI, a Scientific and Financial Auditor. 
-MANDATORY CITATION RULE:
-Every factual statement MUST be cited using the format: 
-'As seen on Page [X] in [Full Paper Title] by [Primary Author] et al...'
-
-FINANCIAL & TABLE AUDIT RULES:
-1. HIERARCHY: When asked for a category total, do NOT grab the first number you see. Look specifically for a line that contains the word 'Total' (e.g., 'Insurance and other financial reserves Total').
-2. VERIFICATION: If you list sub-items, verify their sum against the reported 'Total' line in the context. If they differ, state that you are reporting the explicit 'Total' line from the document.
-3. CURRENCY: All figures in the Budget documents are in MILLIONS of dollars unless otherwise stated. Convert $788,871 to $788.9 Billion in your final explanation for readability.
-
-MULTI-PAGE SYNTHESIS:
-1. Connect definitions (e.g., Page 11) to applications (e.g., Page 21) across different chunks.
-2. For Equation 3.22, provide the LaTeX: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
-3.Use LaTeX for all other complex variables or formulas.
-"""},
-                                      {"role": "user", "content": f"Context: {context}\n\nQuestion: {query}"}]
+                            messages=[
+                                {
+                                    "role": "system", 
+                                    "content": """You are OneSwifty AI, a high-precision Scientific Auditor. 
+                                    
+                                    MULTI-PAGE SYNTHESIS RULES:
+                                    1. Connect definitions (e.g., initial conditions) to applications (e.g., void evolution) across different pages.
+                                    2. MANDATORY CITATION: Every factual statement MUST be cited as 'As seen on Page [X] in [Title]'.
+                                    
+                                    TECHNICAL FORMATTING:
+                                    - If discussing the hierarchy of effects in Modified Gravity (MG), specifically reference the growth factor constraint.
+                                    - For Equation 3.22, use this exact LaTeX: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
+                                    - Use LaTeX for all other complex variables or formulas."""
+                                },
+                                {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
+                            ]
                         )
-                        st.chat_message("assistant").write(resp.choices[0].message.content)
-                        log_query(query, "...", results[0][2], resp.usage.prompt_tokens, resp.usage.completion_tokens)
+                        
+                        answer = resp.choices[0].message.content
+                        
+                        with st.chat_message("assistant"):
+                            # Handle LaTeX rendering if the AI followed instructions
+                            if "$$" in answer:
+                                parts = answer.split("$$")
+                                for i, part in enumerate(parts):
+                                    if i % 2 == 1: 
+                                        st.latex(part.strip())
+                                    else: 
+                                        st.markdown(part)
+                            else:
+                                st.markdown(answer)
+                        
+                        log_query(query, answer, 0.9, resp.usage.prompt_tokens, resp.usage.completion_tokens)
                 conn.close()
 
 # --- SIDEBAR ADMIN ---
