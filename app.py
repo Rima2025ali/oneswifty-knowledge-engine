@@ -233,6 +233,38 @@ def render_scientific_audit(text):
     with st.container(border=True):
         st.markdown("### 🔬 OneSwifty Scientific Audit")
         st.markdown(text)
+import re
+import streamlit as st
+
+def extract_key_findings(text):
+    """
+    Scans the AI response for specific scientific 'triggers' 
+    and returns a clean bulleted list of the most critical points.
+    """
+    # Define our 'OneSwifty' high-value triggers
+    triggers = [
+        r".*?stronger effective gravity.*?\.",
+        r".*?μNL > 1.*?\.",
+        r".*?sub-?percent level.*?\.",
+        r".*?deeper voids.*?\.",
+        r".*?initial conditions.*?\.",
+        r".*?linear growth.*?\."
+    ]
+    
+    findings = []
+    for pattern in triggers:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            # Clean up any weird LaTeX formatting for the summary bullet
+            clean_bullet = match.group(0).strip().replace("(", "").replace(")", "")
+            findings.append(clean_bullet)
+    
+    # Render the summary if we found hits
+    if findings:
+        with st.expander("📝 Quick Audit Summary", expanded=True):
+            for point in findings[:4]: # Limit to top 4 for cleanliness
+                st.markdown(f"**•** {point}")
+
 # --- STEP 3: SEARCH (FORCE LaTeX & SOURCE MAP) ---
 if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
@@ -301,8 +333,11 @@ else:
 
                         with st.chat_message("assistant"):
                         if answer:
-       
-                        render_scientific_audit(answer)
+                        # Show the quick summary first
+                        extract_key_findings(answer)
+        
+                        # Then show the full detailed audit in the border box
+                        render_scientific_audit(answer)                        
                         
                         log_query(query, answer, 0.9, resp.usage.prompt_tokens, resp.usage.completion_tokens)
                 conn.close()
