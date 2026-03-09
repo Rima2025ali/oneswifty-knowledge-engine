@@ -180,30 +180,41 @@ st.divider()
 
 import re
 
-# Helper function to prevent Unicode/LaTeX double-rendering
-def render_scientific_text(text):
-    # Fix the specific (\mu_NL) or (delta_E) issue by converting (...) to $...$
-    # This regex looks for ( followed by a backslash and text, then )
-    text = re.sub(r'\((?=\\)', '$', text) 
-    text = re.sub(r'(?<=\\.*)\)', '$', text)
+def bulletproof_latex_render(text):
+    """
+    Forcibly converts academic style (\LaTeX) or (variable) 
+    into Streamlit-friendly $LaTeX$ or $variable$.
+    """
+    # 1. Handle the (\mu_NL) or (\delta_E) case specifically
+    # Looks for '(' followed by '\' and eventually ')'
+    text = re.sub(r'\((?=\\)(.*?)\)', r'$\1$', text)
     
-    # Standardize remaining symbols
-    symbols = ['μ', 'δ', 'α', 'ρ', 'π']
-    for sym in symbols:
-        text = re.sub(rf'(?<!\$){sym}(?!\$)', f'${sym}$', text)
-    
+    # 2. Handle cases where it didn't use a backslash but meant math, e.g., (delta_E)
+    # We look for common physics variables inside parentheses
+    physics_vars = ['delta', 'mu', 'alpha', 'rho', 'pi', 'beta', 'lambda', 'gamma']
+    for var in physics_vars:
+        text = re.sub(rf'\({var}(.*?)\)', rf'$\\{var}\1$', text)
+
+    # 3. Clean up any lingering Unicode Greek that escaped
+    unicode_map = {'μ': r'\mu', 'δ': r'\delta', 'α': r'\alpha', 'ρ': r'\rho'}
+    for char, latex in unicode_map.items():
+        text = text.replace(char, f"${latex}$")
+
+    # 4. Final Render
     st.markdown(text)
-import re
+
+
+# import re
 
 # Helper function to prevent Unicode/LaTeX double-rendering
-def render_scientific_text(text):
+# def render_scientific_text(text):
     # Standardize Greek letters to LaTeX if they aren't already wrapped
-    symbols = ['μ', 'δ', 'α', 'ρ', 'π']
-    for sym in symbols:
-        text = re.sub(rf'(?<!\$){sym}(?!\$)', f'${sym}$', text)
+#     symbols = ['μ', 'δ', 'α', 'ρ', 'π']
+#     for sym in symbols:
+#         text = re.sub(rf'(?<!\$){sym}(?!\$)', f'${sym}$', text)
     # Fix common specific artifacts
-    text = text.replace('μNL', r'$\mu_{NL}$')
-    st.markdown(text)
+#     text = text.replace('μNL', r'$\mu_{NL}$')
+#     st.markdown(text)
 
 # --- STEP 3: SEARCH (FORCE LaTeX & SOURCE MAP) ---
 if is_over_budget:
@@ -273,7 +284,8 @@ else:
 
                         # --- RENDER CHAT ANSWER ---
                         with st.chat_message("assistant"):
-                            render_scientific_text(answer)
+                            if answer:
+                            bulletproof_latex_render(answer)
                         
                         log_query(query, answer, 0.9, resp.usage.prompt_tokens, resp.usage.completion_tokens)
                 conn.close()
