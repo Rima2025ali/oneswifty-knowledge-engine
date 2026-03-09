@@ -178,16 +178,16 @@ if conn:
 
 st.divider()
 
-# --- STEP 3: SEARCH (WITH TECHNICAL SUMMARY TRIGGER) ---
+# --- STEP 3: SEARCH (FORCE LaTeX & SOURCE MAP) ---
 if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
 else:
     st.subheader("🔍 Step 3: Intelligent Search")
-    query = st.chat_input("What would you like to ask about the uploaded files?")
+    query = st.chat_input("Ask about MG vs GR hierarchy...")
     
     if query:
         st.chat_message("user").write(query)
-        with st.spinner("OneSwifty is performing multi-page synthesis..."):
+        with st.spinner("Analyzing gravitational couplings..."):
             query_vec = get_embedding(query)
             conn = get_connection()
             if conn:
@@ -204,12 +204,12 @@ else:
                             messages=[
                                 {
                                     "role": "system", 
-                                    "content": """You are OneSwifty AI, a Scientific Auditor.
-                                    RULES:
-                                    1. Connect initial condition definitions to void evolution applications.
-                                    2. If discussing Modified Gravity (MG) hierarchy, you MUST include Equation 3.22: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
-                                    3. Explain that MG has stronger gravity, requiring larger ICs for fixed underdensity.
-                                    4. Cite every fact: 'As seen on Page [X] in [Title]'."""
+                                    "content": """You are OneSwifty AI. 
+                                    When discussing Modified Gravity (MG) hierarchy:
+                                    1. Always include Equation 3.22 exactly as: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
+                                    2. Focus on how alpha_B0 and m parameters strengthen effective gravity.
+                                    3. Explain that deeper voids amplify MG effects due to non-linear coupling.
+                                    4. Cite as: (Moretti et al., P.[X])."""
                                 },
                                 {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
                             ]
@@ -217,24 +217,29 @@ else:
                         
                         answer = resp.choices[0].message.content
                         
-                        # --- TECHNICAL SUMMARY BOX TRIGGER ---
-                        # Detects the equation in the AI's response
-                        if "f_{MG}(z)>1" in answer:
-                            st.info("### 🔬 Technical Summary: MG Hierarchy Detected")
+                        # --- TECHNICAL SUMMARY & SOURCE MAP ---
+                        # Trigger if "Modified Gravity" or the equation is mentioned
+                        if "Modified Gravity" in answer or "MG" in answer:
+                            st.info("### 🔬 Technical Summary: MG Hierarchy & Coupling")
+                            st.latex(r"max_{0\le z\le z_{in}}f_{MG}(z)>1")
                             st.markdown("""
-                            **Core Synthesis:**
-                            * **Gravitational Strength:** MG > GR, leading to more efficient non-linear evolution.
-                            * **Initial Conditions:** Larger ICs required in MG to match fixed underdensity ($\delta_E$).
-                            * **Linear Growth:** Enhanced in MG, increasing extrapolation of perturbations.
-                            * **Void Depth:** MG effects are amplified as $\delta_E$ decreases (deeper voids).
+                            **Hierarchy of Effects:**
+                            * **Parameter Impact:** Increasing $\\alpha_{B0}$ or $m$ strengthens effective gravity.
+                            * **Evolution Efficiency:** MG progresses non-linear evolution faster, requiring larger ICs for fixed $\\delta_E$.
+                            * **Void Scaling:** MG deviations from GR are amplified as $\\delta_E$ decreases (deeper voids).
                             """)
-                        
-                        # --- RENDER MAIN ANSWER ---
+                            
+                            # --- NEW: SOURCE MAP ---
+                            with st.expander("📍 Source Map: Cross-Document Evidence", expanded=False):
+                                source_data = pd.DataFrame(results, columns=["Text", "Document", "Similarity", "Page"])
+                                st.table(source_data[["Document", "Page", "Similarity"]])
+
+                        # --- RENDER CHAT ANSWER ---
                         with st.chat_message("assistant"):
+                            # Logic to render LaTeX parts vs Markdown parts
                             if "$$" in answer:
-                                parts = answer.split("$$")
-                                for i, part in enumerate(parts):
-                                    if i % 2 == 1: st.latex(part.strip())
+                                for part in answer.split("$$"):
+                                    if part.strip() == "max_{0\\le z\\le z_{in}}f_{MG}(z)>1": st.latex(part)
                                     else: st.markdown(part)
                             else:
                                 st.markdown(answer)
