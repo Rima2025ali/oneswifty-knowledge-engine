@@ -217,27 +217,23 @@ def render_scientific_audit(text):
         
 import re
 
-def render_scientific_audit(text):
-    """
-    Cleans LaTeX formatting and renders inside a high-precision box.
-    """
-    # Fix academic parentheses (\mu) -> $\mu$
-    text = re.sub(r'\((?=\s?\\)(.*?)\)', r'$\1$', text)
-    
-    # Fix plain text variables (delta_E) -> $\delta_E$
-    physics_vars = ['delta', 'mu', 'alpha', 'rho', 'pi', 'beta', 'lambda', 'gamma']
-    for var in physics_vars:
-        text = re.sub(rf'\({var}(.*?)\)', rf'$\\{var}\1$', text)
 
-    # Wrap standalone Unicode in LaTeX
-    unicode_map = {'μ': r'\mu', 'δ': r'\delta', 'α': r'\alpha', 'ρ': r'\rho'}
-    for char, latex in unicode_map.items():
-        text = re.sub(rf'(?<!\$){char}(?!\$)', f'${latex}$', text)
+    def render_scientific_audit(text):
+    # 1. Clean math artifacts
+    text = text.replace("μNL", r"$\mu_{NL}$").replace("μL", r"$\mu_L$")
+    text = text.replace("δE", r"$\delta_E$")
 
-    # Render in a professional Auditor Box
+    # 2. BEAUTIFY CITATIONS: Turn (As seen on Page X...) into a small-text footer
+    # This keeps the 'Scientific Auditor' tone professional
+    citation_pattern = r"\(As seen on Page (\d+) in \"(.*?)\" by (.*?)\)"
+    text = re.sub(citation_pattern, r"\n\n> 📍 *Source: \3 | \2 (Page \1)*", text)
+
+    # 3. RENDER
     with st.container(border=True):
         st.markdown("### 🔬 OneSwifty Scientific Audit")
         st.markdown(text)
+
+
 import re
 import streamlit as st
 
