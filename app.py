@@ -181,39 +181,19 @@ st.divider()
 import re
 import streamlit as st
 
-
 def render_scientific_audit(text):
-    """
-    Aggressively cleans Unicode artifacts and wraps math in LaTeX 
-    for a high-precision Auditor interface.
-    """
-    # 1. HARD STRIP: Replace known problematic Unicode with pure LaTeX
-    # This stops the 'μNL μNL' glitch at the source
-    cleaning_map = {
-        "μNL": r"$\mu_{NL}$",
-        "μ": r"$\mu$",
-        "δE": r"$\delta_E$",
-        "δ": r"$\delta$",
-        "α": r"$\alpha$",
-        "ρ": r"$\rho$",
-        "π": r"$\pi$"
-    }
+    # Ensure the subscript {NL} and {E} are always escaped correctly for KaTeX
+    text = text.replace(r"\mu_{NL}", r"$\mu_{\text{NL}}$")
+    text = text.replace(r"\delta E", r"$\delta_E$")
+    text = text.replace(r"\delta_E", r"$\delta_E$")
     
-    for key, value in cleaning_map.items():
-        text = text.replace(key, value)
-
-    # 2. FIX PARENTHESES MATH: Catch ( \mu_NL ) and turn into $ \mu_NL $
-    text = re.sub(r'\((?=\s?\\)(.*?)\)', r'$\1$', text)
-    
-    # 3. PREVENT TRIPLE-WRAPPING: If we ended up with $$...$$, fix it
-    text = text.replace("$$$", "$").replace("$$", "$") # Ensure single $ for inline
-    # But restore double $$ for standalone blocks if they were intended
-    # (Optional: only if you expect large formulas)
-
-    # 4. FINAL RENDER IN A STYLED BOX
+    # Add a CSS-styled border for that 'OneSwifty' branding
     with st.container(border=True):
-        st.markdown("### 🔬 OneSwifty Scientific Audit")
+        st.markdown("### 🔬 OneSwifty Scientific Audit: MG vs GR")
         st.markdown(text)
+        st.caption("🔍 Precision Audit based on Moretti et al. (2023)")
+        
+
         
 
 def extract_key_findings(text):
