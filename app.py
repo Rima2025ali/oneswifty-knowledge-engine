@@ -211,6 +211,7 @@ FINANCIAL & TABLE AUDIT RULES:
 MULTI-PAGE SYNTHESIS:
 1. Connect definitions (e.g., Page 11) to applications (e.g., Page 21) across different chunks.
 2. For Equation 3.22, provide the LaTeX: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
+3.Use LaTeX for all other complex variables or formulas.
 """},
                                       {"role": "user", "content": f"Context: {context}\n\nQuestion: {query}"}]
                         )
