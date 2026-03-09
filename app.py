@@ -178,6 +178,18 @@ if conn:
 
 st.divider()
 
+import re
+
+# Helper function to prevent Unicode/LaTeX double-rendering
+def render_scientific_text(text):
+    # Standardize Greek letters to LaTeX if they aren't already wrapped
+    symbols = ['μ', 'δ', 'α', 'ρ', 'π']
+    for sym in symbols:
+        text = re.sub(rf'(?<!\$){sym}(?!\$)', f'${sym}$', text)
+    # Fix common specific artifacts
+    text = text.replace('μNL', r'$\mu_{NL}$')
+    st.markdown(text)
+
 # --- STEP 3: SEARCH (FORCE LaTeX & SOURCE MAP) ---
 if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
@@ -197,65 +209,49 @@ else:
                     results = cur.fetchall()
                     
                     if results:
+                        # Fixed: consolidated context string
                         context = "\n\n".join([f"DOC: {r[1]} | PAGE: {r[3]} | CONTENT: {r[0]}" for r in results])
                         
                         resp = client.chat.completions.create(
                             model="gpt-4o",
-                          messages=[
-        {
-            "role": "system", 
-            "content": """You are OneSwifty AI, a high-precision Scientific Auditor. 
+                            messages=[
+                                {
+                                    "role": "system", 
+                                    "content": r"""You are OneSwifty AI, a high-precision Scientific Auditor. 
             
-            CRITICAL FORMATTING RULES:
-            1. STANDALONE MATH: Use double dollar signs for equations:
-                $$ [Formula] $$
-            2. Correct Form for Vainshtein: 
-               $$(R_V/R)^3 = \frac{32\pi}{3} G \beta^2 \lambda^2 \bar{\rho}_m \delta_v$$
-            3. NO BRACKETS: Never use \[ \] or \( \) for math.
-            4. TECHNICAL AUDIT: Specifically identify 'imaginary forces', 'unphysical branches', or 'instabilities' found in the context.
-            
-
-
-            MATHEMATICAL PRECISION RULES:
-            - Closely analyze variable placement (multipliers vs. denominators). 
-            - For the Vainshtein scale (R_V/R)^3, ensure the density contrast (delta_v) is a MULTIPLIER, not a denominator.
-            - Correct Form: $$(R_V/R)^3 = \\frac{32\\pi}{3} G \\beta^2 \\lambda^2 \\bar{\rho}_m \\delta_v$$
-            - If the context provides a specific numeric bound (e.g., delta_min), include it exactly."""
-        },
-       # {"role": "user", "content": f"Context:\n{context_text}\n\nQuestion: {query}"}
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"} # Fixed variable name
+                                    CRITICAL FORMATTING RULES:
+                                    1. STANDALONE MATH: Use double dollar signs for equations: $$ [Formula] $$
+                                    2. LATEX ONLY: Never use Unicode Greek characters (μ, δ). Always use $\mu$, $\delta$.
+                                    3. NO BRACKETS: Never use \[ \] or \( \).
+                                    4. VAINSHTEIN: Correct form is $$(R_V/R)^3 = \frac{32\pi}{3} G \beta^2 \lambda^2 \bar{\rho}_m \delta_v$$
+                                    """
+                                },
+                                {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
                             ]
                         )
                         
                         answer = resp.choices[0].message.content
                         
                         # --- TECHNICAL SUMMARY & SOURCE MAP ---
-                        # Trigger if "Modified Gravity" or the equation is mentioned
-                        if "Modified Gravity" in answer or "MG" in answer:
+                        if any(x in answer for x in ["Modified Gravity", "MG"]):
                             st.info("### 🔬 Technical Summary: MG Hierarchy & Coupling")
                             st.latex(r"max_{0\le z\le z_{in}}f_{MG}(z)>1")
                             st.markdown("""
                             **Hierarchy of Effects:**
                             * **Parameter Impact:** Increasing $\\alpha_{B0}$ or $m$ strengthens effective gravity.
-                            * **Evolution Efficiency:** MG progresses non-linear evolution faster, requiring larger ICs for fixed $\\delta_E$.
-                            * **Void Scaling:** MG deviations from GR are amplified as $\\delta_E$ decreases (deeper voids).
+                            * **Evolution Efficiency:** MG progresses faster, requiring smaller ICs for fixed $\\delta_E$.
+                            * **Void Scaling:** MG deviations are amplified in deeper voids.
                             """)
                             
-                            # --- NEW: SOURCE MAP ---
                             with st.expander("📍 Source Map: Cross-Document Evidence", expanded=False):
                                 source_data = pd.DataFrame(results, columns=["Text", "Document", "Similarity", "Page"])
+                                # Optional: Convert similarity to percentage for better UX
+                                source_data["Similarity"] = source_data["Similarity"].apply(lambda x: f"{x*100:.1f}%")
                                 st.table(source_data[["Document", "Page", "Similarity"]])
 
                         # --- RENDER CHAT ANSWER ---
                         with st.chat_message("assistant"):
-                            # Logic to render LaTeX parts vs Markdown parts
-                            if "$$" in answer:
-                                for part in answer.split("$$"):
-                                    if part.strip() == "max_{0\\le z\\le z_{in}}f_{MG}(z)>1": st.latex(part)
-                                    else: st.markdown(part)
-                            else:
-                                st.markdown(answer)
+                            render_scientific_text(answer)
                         
                         log_query(query, answer, 0.9, resp.usage.prompt_tokens, resp.usage.completion_tokens)
                 conn.close()
