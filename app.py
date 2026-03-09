@@ -210,7 +210,29 @@ def render_scientific_audit(text):
 with st.chat_message("assistant"):
     if answer:
         render_scientific_audit(answer)
+import re
 
+def render_scientific_audit(text):
+    """
+    Cleans LaTeX formatting and renders inside a high-precision box.
+    """
+    # Fix academic parentheses (\mu) -> $\mu$
+    text = re.sub(r'\((?=\s?\\)(.*?)\)', r'$\1$', text)
+    
+    # Fix plain text variables (delta_E) -> $\delta_E$
+    physics_vars = ['delta', 'mu', 'alpha', 'rho', 'pi', 'beta', 'lambda', 'gamma']
+    for var in physics_vars:
+        text = re.sub(rf'\({var}(.*?)\)', rf'$\\{var}\1$', text)
+
+    # Wrap standalone Unicode in LaTeX
+    unicode_map = {'μ': r'\mu', 'δ': r'\delta', 'α': r'\alpha', 'ρ': r'\rho'}
+    for char, latex in unicode_map.items():
+        text = re.sub(rf'(?<!\$){char}(?!\$)', f'${latex}$', text)
+
+    # Render in a professional Auditor Box
+    with st.container(border=True):
+        st.markdown("### 🔬 OneSwifty Scientific Audit")
+        st.markdown(text)
 # --- STEP 3: SEARCH (FORCE LaTeX & SOURCE MAP) ---
 if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
