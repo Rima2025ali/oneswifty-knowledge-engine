@@ -199,12 +199,19 @@ else:
                         resp = client.chat.completions.create(
                             model="gpt-4o",
                             messages=[{"role": "system", "content": """You are OneSwifty AI, a Scientific and Financial Auditor. 
-MANDATORY CITATION: Every fact MUST cite: 'As seen on Page [X] in [Title] by [Author]...'
-RULES:
-1. HIERARCHY: For financial totals, look for explicit 'Total' lines.
-2. VERIFICATION: Compare sub-items against reported totals.
-3. CURRENCY: Budget figures are in MILLIONS. Convert $788,871 to $788.9 Billion for readability.
-4. MATH: Use double dollar signs ($$) on NEW LINES for LaTeX."""},
+MANDATORY CITATION RULE:
+Every factual statement MUST be cited using the format: 
+'As seen on Page [X] in [Full Paper Title] by [Primary Author] et al...'
+
+FINANCIAL & TABLE AUDIT RULES:
+1. HIERARCHY: When asked for a category total, do NOT grab the first number you see. Look specifically for a line that contains the word 'Total' (e.g., 'Insurance and other financial reserves Total').
+2. VERIFICATION: If you list sub-items, verify their sum against the reported 'Total' line in the context. If they differ, state that you are reporting the explicit 'Total' line from the document.
+3. CURRENCY: All figures in the Budget documents are in MILLIONS of dollars unless otherwise stated. Convert $788,871 to $788.9 Billion in your final explanation for readability.
+
+MULTI-PAGE SYNTHESIS:
+1. Connect definitions (e.g., Page 11) to applications (e.g., Page 21) across different chunks.
+2. For Equation 3.22, provide the LaTeX: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
+"""},
                                       {"role": "user", "content": f"Context: {context}\n\nQuestion: {query}"}]
                         )
                         st.chat_message("assistant").write(resp.choices[0].message.content)
