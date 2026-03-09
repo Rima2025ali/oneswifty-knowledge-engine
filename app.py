@@ -338,8 +338,7 @@ else:
 
                         with st.chat_message("assistant"):
                         if answer:
-                        # Show the quick summary first
-                        extract_key_findings(answer)
+                        
         
                         # Then show the full detailed audit in the border box
                         render_scientific_audit(answer)                        
