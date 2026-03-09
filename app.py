@@ -181,6 +181,7 @@ st.divider()
 import re
 import streamlit as st
 
+def ender_scientific_audit(text):
 """
     Aggressively cleans Unicode artifacts and wraps math in LaTeX 
     for a high-precision Auditor interface.
