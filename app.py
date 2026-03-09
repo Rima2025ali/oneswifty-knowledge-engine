@@ -125,7 +125,7 @@ with st.container():
                 with st.spinner("AI analyzing document identity..."):
                     meta_response = client.chat.completions.create(
                         model="gpt-4o-mini",
-                        messages=[{"role": "system", "content": "Extract Title | Institutional Author | Category. Format: Title | Author | Category"},
+                        messages=[{"role": "system", "content": "You are a technical librarian. Extract the ACTUAL FORMAL TITLE, the FULL LIST of all authors (comma-separated), and a one-word CATEGORY. Return: Title | Author1, Author2, etc. | Category"},
                                   {"role": "user", "content": first_page_sample}]
                     )
                     try:
