@@ -178,12 +178,13 @@ if conn:
 
 st.divider()
 
-# --- STEP 3: SEARCH (REFINED FOR EQUATION 3.22) ---
+# --- STEP 3: SEARCH (WITH TECHNICAL SUMMARY TRIGGER) ---
 if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
 else:
     st.subheader("🔍 Step 3: Intelligent Search")
     query = st.chat_input("What would you like to ask about the uploaded files?")
+    
     if query:
         st.chat_message("user").write(query)
         with st.spinner("OneSwifty is performing multi-page synthesis..."):
@@ -194,25 +195,21 @@ else:
                     cur.execute("""SELECT content_text, title, 1 - (embedding <=> %s::vector) AS sim, page_number 
                                 FROM oneswifty_knowledge ORDER BY sim DESC LIMIT 5""", (query_vec,))
                     results = cur.fetchall()
+                    
                     if results:
                         context = "\n\n".join([f"DOC: {r[1]} | PAGE: {r[3]} | CONTENT: {r[0]}" for r in results])
                         
-                        # REFINED SYSTEM PROMPT
                         resp = client.chat.completions.create(
                             model="gpt-4o",
                             messages=[
                                 {
                                     "role": "system", 
-                                    "content": """You are OneSwifty AI, a high-precision Scientific Auditor. 
-                                    
-                                    MULTI-PAGE SYNTHESIS RULES:
-                                    1. Connect definitions (e.g., initial conditions) to applications (e.g., void evolution) across different pages.
-                                    2. MANDATORY CITATION: Every factual statement MUST be cited as 'As seen on Page [X] in [Title]'.
-                                    
-                                    TECHNICAL FORMATTING:
-                                    - If discussing the hierarchy of effects in Modified Gravity (MG), specifically reference the growth factor constraint.
-                                    - For Equation 3.22, use this exact LaTeX: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
-                                    - Use LaTeX for all other complex variables or formulas."""
+                                    "content": """You are OneSwifty AI, a Scientific Auditor.
+                                    RULES:
+                                    1. Connect initial condition definitions to void evolution applications.
+                                    2. If discussing Modified Gravity (MG) hierarchy, you MUST include Equation 3.22: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
+                                    3. Explain that MG has stronger gravity, requiring larger ICs for fixed underdensity.
+                                    4. Cite every fact: 'As seen on Page [X] in [Title]'."""
                                 },
                                 {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
                             ]
@@ -220,15 +217,25 @@ else:
                         
                         answer = resp.choices[0].message.content
                         
+                        # --- TECHNICAL SUMMARY BOX TRIGGER ---
+                        # Detects the equation in the AI's response
+                        if "f_{MG}(z)>1" in answer:
+                            st.info("### 🔬 Technical Summary: MG Hierarchy Detected")
+                            st.markdown("""
+                            **Core Synthesis:**
+                            * **Gravitational Strength:** MG > GR, leading to more efficient non-linear evolution.
+                            * **Initial Conditions:** Larger ICs required in MG to match fixed underdensity ($\delta_E$).
+                            * **Linear Growth:** Enhanced in MG, increasing extrapolation of perturbations.
+                            * **Void Depth:** MG effects are amplified as $\delta_E$ decreases (deeper voids).
+                            """)
+                        
+                        # --- RENDER MAIN ANSWER ---
                         with st.chat_message("assistant"):
-                            # Handle LaTeX rendering if the AI followed instructions
                             if "$$" in answer:
                                 parts = answer.split("$$")
                                 for i, part in enumerate(parts):
-                                    if i % 2 == 1: 
-                                        st.latex(part.strip())
-                                    else: 
-                                        st.markdown(part)
+                                    if i % 2 == 1: st.latex(part.strip())
+                                    else: st.markdown(part)
                             else:
                                 st.markdown(answer)
                         
