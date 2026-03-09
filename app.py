@@ -180,36 +180,41 @@ st.divider()
 
 import re
 
+import re
+
 def render_scientific_audit(text):
     """
-    Cleans LaTeX and renders the answer inside a high-precision Auditor box.
+    Aggressively cleans Unicode artifacts and wraps math in LaTeX 
+    for a high-precision Auditor interface.
     """
-    # 1. FIX PARENTHESES MATH: ( \mu_NL ) -> $ \mu_NL $
-    # This regex is more robust for academic-style outputs
+    # 1. HARD STRIP: Replace known problematic Unicode with pure LaTeX
+    # This stops the 'μNL μNL' glitch at the source
+    cleaning_map = {
+        "μNL": r"$\mu_{NL}$",
+        "μ": r"$\mu$",
+        "δE": r"$\delta_E$",
+        "δ": r"$\delta$",
+        "α": r"$\alpha$",
+        "ρ": r"$\rho$",
+        "π": r"$\pi$"
+    }
+    
+    for key, value in cleaning_map.items():
+        text = text.replace(key, value)
+
+    # 2. FIX PARENTHESES MATH: Catch ( \mu_NL ) and turn into $ \mu_NL $
     text = re.sub(r'\((?=\s?\\)(.*?)\)', r'$\1$', text)
     
-    # 2. FIX PLAIN TEXT VARIABLES: (delta_E) -> $\delta_E$
-    physics_vars = ['delta', 'mu', 'alpha', 'rho', 'pi', 'beta', 'lambda', 'gamma']
-    for var in physics_vars:
-        # Matches (delta_E) or (delta)
-        text = re.sub(rf'\({var}(.*?)\)', rf'$\\{var}\1$', text)
+    # 3. PREVENT TRIPLE-WRAPPING: If we ended up with $$...$$, fix it
+    text = text.replace("$$$", "$").replace("$$", "$") # Ensure single $ for inline
+    # But restore double $$ for standalone blocks if they were intended
+    # (Optional: only if you expect large formulas)
 
-    # 3. FIX REMAINING UNICODE: μ -> $\mu$
-    unicode_map = {'μ': r'\mu', 'δ': r'\delta', 'α': r'\alpha', 'ρ': r'\rho'}
-    for char, latex in unicode_map.items():
-        # Only replace if not already in a LaTeX block
-        text = re.sub(rf'(?<!\$){char}(?!\$)', f'${latex}$', text)
-
-    # 4. FINAL RENDER IN A BOX
-    # Using st.info for a professional 'Auditor' look
+    # 4. FINAL RENDER IN A STYLED BOX
     with st.container(border=True):
-        st.markdown("### 🔬 Scientific Audit Result")
+        st.markdown("### 🔬 OneSwifty Scientific Audit")
         st.markdown(text)
-
-# --- USAGE ---
-with st.chat_message("assistant"):
-    if answer:
-        render_scientific_audit(answer)
+        
 import re
 
 def render_scientific_audit(text):
