@@ -88,7 +88,7 @@ def log_query(query, answer, confidence, in_t, out_t):
         writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), query[:100], f"{confidence*100:.2f}%", in_t, out_t, f"{cost_usd:.6f}"])
 
 # --- MAIN INTERFACE ---
-st.title("🚀 OneSwifty: Universal Knowledge Engine")
+st.title("🚀 OneSwifty: Universal Knowledge Engine[Testing]")
 
 # --- INSTRUCTIONS ---
 st.markdown("""
@@ -183,7 +183,7 @@ if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
 else:
     st.subheader("🔍 Step 3: Intelligent Search")
-    query = st.chat_input("Ask a technical or financial question...")
+    query = st.chat_input("What would you like to ask about the uploaded files?")
     if query:
         st.chat_message("user").write(query)
         with st.spinner("OneSwifty is auditing documents..."):
