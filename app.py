@@ -190,6 +190,18 @@ def render_scientific_text(text):
     text = text.replace('μNL', r'$\mu_{NL}$')
     st.markdown(text)
 
+import re
+
+# Helper function to prevent Unicode/LaTeX double-rendering
+def render_scientific_text(text):
+    # Standardize Greek letters to LaTeX if they aren't already wrapped
+    symbols = ['μ', 'δ', 'α', 'ρ', 'π']
+    for sym in symbols:
+        text = re.sub(rf'(?<!\$){sym}(?!\$)', f'${sym}$', text)
+    # Fix common specific artifacts
+    text = text.replace('μNL', r'$\mu_{NL}$')
+    st.markdown(text)
+
 # --- STEP 3: SEARCH (FORCE LaTeX & SOURCE MAP) ---
 if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
@@ -255,7 +267,6 @@ else:
                         
                         log_query(query, answer, 0.9, resp.usage.prompt_tokens, resp.usage.completion_tokens)
                 conn.close()
-
 # --- SIDEBAR ADMIN ---
 with st.sidebar:
     st.header("🔐 Admin Controls")
