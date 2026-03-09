@@ -216,56 +216,53 @@ def render_scientific_audit(text):
         st.markdown(text)
         
 import re
-
-
-    def render_scientific_audit(text):
-    # 1. Clean math artifacts
-    text = text.replace("μNL", r"$\mu_{NL}$").replace("μL", r"$\mu_L$")
-    text = text.replace("δE", r"$\delta_E$")
-
-    # 2. BEAUTIFY CITATIONS: Turn (As seen on Page X...) into a small-text footer
-    # This keeps the 'Scientific Auditor' tone professional
-    citation_pattern = r"\(As seen on Page (\d+) in \"(.*?)\" by (.*?)\)"
-    text = re.sub(citation_pattern, r"\n\n> 📍 *Source: \3 | \2 (Page \1)*", text)
-
-    # 3. RENDER
-    with st.container(border=True):
-        st.markdown("### 🔬 OneSwifty Scientific Audit")
-        st.markdown(text)
-
-
-import re
 import streamlit as st
+
+
+   def render_scientific_audit(text):
+    # Ensure the subscript {NL} and {E} are always escaped correctly for KaTeX
+    text = text.replace(r"\mu_{NL}", r"$\mu_{\text{NL}}$")
+    text = text.replace(r"\delta E", r"$\delta_E$")
+    text = text.replace(r"\delta_E", r"$\delta_E$")
+    
+    # Add a CSS-styled border for that 'OneSwifty' branding
+    with st.container(border=True):
+        st.markdown("### 🔬 OneSwifty Scientific Audit: MG vs GR")
+        st.markdown(text)
+        st.caption("🔍 Precision Audit based on Moretti et al. (2023)")
+
+
+
 
 def extract_key_findings(text):
     """
-    Scans the AI response for specific scientific 'triggers' 
-    and returns a clean bulleted list of the most critical points.
+    Scans the high-precision audit for key physical constraints 
+    to create a 'Quick Audit' summary for the user.
     """
-    # Define our 'OneSwifty' high-value triggers
+    # Updated triggers to match our LaTeX-heavy answers
     triggers = [
         r".*?stronger effective gravity.*?\.",
-        r".*?μNL > 1.*?\.",
+        r".*?\\mu_{NL} > 1.*?\.",           # Updated for LaTeX
         r".*?sub-?percent level.*?\.",
         r".*?deeper voids.*?\.",
         r".*?initial conditions.*?\.",
-        r".*?linear growth.*?\."
+        r".*?\\delta_E.*?\."                # Updated for density contrast
     ]
     
     findings = []
     for pattern in triggers:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
-            # Clean up any weird LaTeX formatting for the summary bullet
+            # Cleaning the bullet point: Remove parentheses the LLM likes to add
             clean_bullet = match.group(0).strip().replace("(", "").replace(")", "")
             findings.append(clean_bullet)
     
-    # Render the summary if we found hits
     if findings:
-        with st.expander("📝 Quick Audit Summary", expanded=True):
-            for point in findings[:4]: # Limit to top 4 for cleanliness
+        # Use a distinctive 'OneSwifty' style for the summary
+        with st.expander("📝 OneSwifty: Key Physical Findings", expanded=True):
+            for point in findings[:4]:
                 st.markdown(f"**•** {point}")
-
+                
 # --- STEP 3: SEARCH (FORCE LaTeX & SOURCE MAP) ---
 if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
@@ -335,7 +332,7 @@ else:
                         with st.chat_message("assistant"):
                         if answer:
                         
-        
+                        render_scientific_audit(answer) 
                         # Then show the full detailed audit in the border box
                         render_scientific_audit(answer)                        
                         
