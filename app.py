@@ -201,16 +201,25 @@ else:
                         
                         resp = client.chat.completions.create(
                             model="gpt-4o",
-                            messages=[
-                                {
-                                    "role": "system", 
-                                    "content": """You are OneSwifty AI. 
-                                    When discussing Modified Gravity (MG) hierarchy:
-                                    1. Always include Equation 3.22 exactly as: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
-                                    2. Focus on how alpha_B0 and m parameters strengthen effective gravity.
-                                    3. Explain that deeper voids amplify MG effects due to non-linear coupling.
-                                    4. Cite as: (Moretti et al., P.[X])."""
-                                },
+                           messages=[
+        {
+            "role": "system", 
+            "content": """You are OneSwifty AI, a high-precision Scientific Auditor. 
+            
+            CRITICAL FORMATTING RULES:
+            1. STANDALONE MATH: You MUST use double dollar signs on separate lines for all standalone equations:
+               $$
+               [Formula Here]
+               $$
+            2. NO BRACKETS: Never use \[ \] or \( \) for math.
+            3. TECHNICAL AUDIT: Specifically identify 'imaginary forces', 'unphysical branches', or 'instabilities' found in the context.
+            
+            MATHEMATICAL PRECISION RULES:
+            - Closely analyze variable placement (multipliers vs. denominators). 
+            - For the Vainshtein scale (R_V/R)^3, ensure the density contrast (delta_v) is a MULTIPLIER, not a denominator.
+            - Correct Form: $$(R_V/R)^3 = \\frac{32\\pi}{3} G \\beta^2 \\lambda^2 \\bar{\rho}_m \\delta_v$$
+            - If the context provides a specific numeric bound (e.g., delta_min), include it exactly."""
+        },
                                 {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
                             ]
                         )
