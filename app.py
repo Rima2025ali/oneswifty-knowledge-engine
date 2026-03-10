@@ -77,16 +77,21 @@ def get_total_spend_today():
         return today_df['Cost_USD'].astype(float).sum()
     except: return 0.0
 
-def log_query(query, answer, confidence, in_t, out_t):
+# --- Logging Function ---
+def log_query(query, answer, confidence):
+    """Saves interaction to a local CSV for performance auditing."""
     log_file = "oneswifty_audit_log.csv"
-    cost_usd = (in_t * 0.0000025) + (out_t * 0.000010)
     file_exists = os.path.isfile(log_file)
     with open(log_file, mode='a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["Timestamp", "Query", "Confidence", "In_Tokens", "Out_Tokens", "Cost_USD"])
-        writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), query[:100], f"{confidence*100:.2f}%", in_t, out_t, f"{cost_usd:.6f}"])
-
+            writer.writerow(["Timestamp", "Query", "AI_Answer", "Confidence_Score"])
+        writer.writerow([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
+            query, 
+            answer, 
+            f"{confidence*100:.2f}%"
+        ])
 # --- MAIN INTERFACE ---
 st.title("🚀 OneSwifty: Universal Knowledge Engine[Testing]")
 
@@ -125,15 +130,17 @@ with st.container():
                 with st.spinner("AI analyzing document identity..."):
                     meta_response = client.chat.completions.create(
                         model="gpt-4o-mini",
-                        messages=[{"role": "system", "content": "You are a technical librarian. Extract the ACTUAL FORMAL TITLE, the FULL LIST of all authors (comma-separated), and a one-word CATEGORY. Return: Title | Author1, Author2, etc. | Category"},
+                        messages=[{"role": "system", "content": "You are a technical librarian. Extract the ACTUAL FORMAL TITLE,
+                        the FULL LIST of all authors (comma-separated), and a one-word CATEGORY. Return: Title | Author1, Author2, etc. | Category"},
                                   {"role": "user", "content": first_page_sample}]
                     )
-                    try:
-                        res_text = meta_response.choices[0].message.content
-                        auto_title, auto_author, auto_category = res_text.split("|")
-                        auto_title, auto_author, auto_category = auto_title.strip(), auto_author.strip(), auto_category.strip()
-                    except:
-                        auto_title, auto_author, auto_category = uploaded_file.name, "Unknown", "General"
+                    metadata_raw = meta_response.choices[0].message.content
+                try:
+                    auto_title, auto_author, auto_category = metadata_raw.split("|")
+                    auto_title, auto_author, auto_category = auto_title.strip(), auto_author.strip(), auto_category.strip()
+                except ValueError:
+                    auto_title, auto_author, auto_category = uploaded_file.name, "Unknown", "General"
+
                 
                 conn = get_connection()
                 if conn:
@@ -151,12 +158,14 @@ with st.container():
                                     end = min(start + chunk_size, len(clean_text))
                                     chunk = clean_text[start:end].strip()
                                     if len(chunk) > 20:
-                                        vec = get_embedding(chunk)
-                                        cur.execute("""INSERT INTO oneswifty_knowledge 
-                                                    (category, content_text, metadata_source, author, title, page_number, embedding)
-                                                    VALUES (%s, %s, %s, %s, %s, %s, %s)""", 
-                                                    (auto_category.strip(), chunk, uploaded_file.name, auto_author.strip(), auto_title.strip(), i + 1, vec))
-                                    start = end - overlap if (end - overlap) > start else end + 1
+                                clean_chunk = "".join(char for char in chunk if char != "\x00").strip()
+                                vec = get_embedding(clean_chunk)
+                                cur.execute("""
+                                    INSERT INTO oneswifty_knowledge 
+                                    (category, content_text, metadata_source, author, title, page_number, embedding)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                """, (auto_category, clean_chunk, uploaded_file.name, auto_author, auto_title, i + 1, vec))
+                            start = end - overlap if (end - overlap) > start else end + 1
                         conn.commit()
                     st.success(f"✅ Ingested: {auto_title}")
                     conn.close()
@@ -292,7 +301,7 @@ FINANCIAL & TABLE AUDIT RULES:
 
 MULTI-PAGE SYNTHESIS:
 1. Connect definitions (e.g., Page 11) to applications (e.g., Page 21) across different chunks.
-2. For Equation 3.22, provide the LaTeX: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
+
 """
                             },
                             {"role": "user", "content": f"Context:\n{context_text}\n\nQuestion: {query}"}
@@ -315,6 +324,14 @@ MULTI-PAGE SYNTHESIS:
                         else:
                             st.markdown(final_answer)
                         log_query(query, answer, 0.9, resp.usage.prompt_tokens, resp.usage.completion_tokens)
+                        with st.expander("🔍 Scientific Audit Logs"):
+                            st.write(f"**Primary Match Score:** {best_score*100:.2f}%")
+                            for res in results:
+                                st.caption(f"**Doc:** {res[2]} | **Page:** {res[5]} | **Relevance:** {res[3]*100:.1f}%")
+                else:
+                    st.error("No knowledge found.")
+
+                
                 conn.close()
 # --- SIDEBAR ADMIN ---
 with st.sidebar:
