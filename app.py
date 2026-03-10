@@ -190,62 +190,105 @@ st.divider()
 # --- FORMATTING FUNCTIONS ---
 
 def clean_math_formatting(text):
-   
     """
-    Centralized scrubber to force strict Streamlit LaTeX formatting.
-    Catches AI hallucinations and brute-forces specific variables.
+    Final standardized scrubber for OneSwifty.
+    Fixes squashed text, double-rendering, and escape errors.
     """
-    # 1. BRUTE FORCE: Catch the exact plain-text variables the AI keeps outputting
-    text = text.replace("fMG(z)", r"$f_{\text{MG}}(z)$")
-    text = text.replace("fMG(a)", r"$f_{\text{MG}}(a)$")
-    text = text.replace("δE", r"$\delta_E$")
-    text = text.replace("δmin(z)", r"$\delta_{\text{min}}(z)$")
+    # 1. PREVENT DOUBLE-TEXT: Remove Zero-Width Spaces (the cause of fMG(z)fMG(z))
+    text = text.replace("\u200b", "")
     
-    # 2. Fix AI using standard ( ) for math instead of $ $
-    text = re.sub(r'\(\s*(\\[a-zA-Z]+[^\)]*)\s*\)', r'$\1$', text)
-    
-    # 3. Fix AI using escaped brackets \( \) or \[ \]
-    text = re.sub(r'\\\((.*?)\\\)', r'$\1$', text)
-    text = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text)
-    
-    # 4. Fix unescaped brackets [ ]
-    text = text.replace(r"\[", "$$").replace(r"\]", "$$")
-    
-    return text
+    # 2. RESCUE SQUASHED TEXT: If a whole paragraph is wrapped in $$, strip it.
+    # LaTeX blocks ($$) remove spaces; sentences should be regular text.
+    if text.count("$$") >= 2:
+        text = re.sub(r"\$\$(.{150,})\$\$", r"\1", text, flags=re.DOTALL)
 
-def render_document_audit(text):
-    """
-    Renders the document audit and strictly enforces KaTeX delimiters.
-    """
-    # Force AI bracket math into Streamlit dollar-sign math
+    # 3. FIX SPECIFIC SYMBOLS: Use double-backslashes (\\) to avoid 'bad escape' errors
+    # This prevents the \d (delta) and \f (fraction) crashes.
+    replacements = {
+        r"fMG\(z\)\s*fMG\s*\(z\)": r"f_{MG}(z)",
+        r"fMG\(a\)\s*fMG\s*\(a\)": r"f_{MG}(a)",
+        r"δE\s*δE": r"\\delta_E",
+        r"δmin": r"\\delta_{min}"
+    }
+    for pattern, replacement in replacements.items():
+        text = re.sub(pattern, replacement, text)
+
+    # 4. STANDARDIZE DELIMITERS: Convert AI brackets into $ wrappers
     text = text.replace(r"\[", "$$").replace(r"\]", "$$")
     text = text.replace(r"\(", "$").replace(r"\)", "$")
     
-    # Catch cases where the AI forgets the backslashes entirely on block equations
-    text = text.replace("\n[ ", "\n$$ ").replace(" ]\n", " $$\n")
-    
+    # 5. WRAP NAKED VARIABLES: Ensures physics terms are formatted properly
+    vars_to_fix = {
+        "fMG": r"f_{MG}",
+        "δE": r"\\delta_E",
+        "z_in": r"z_{in}",
+        "δmin": r"\\delta_{min}"
+    }
+    for raw, latex in vars_to_fix.items():
+        # Using a lambda here is the only way to avoid 'bad escape' errors in Python
+        pattern = f"(?<!\\$){re.escape(raw)}(?!\\$)"
+        text = re.sub(pattern, lambda m, l=latex: f"${l}$", text)
+
+    return text
+
+def render_document_audit(text):
+    """Renders the main audit container with cleaned LaTeX."""
+    clean_text = clean_math_formatting(text)
     with st.container(border=True):
         st.markdown("### 📑 OneSwifty Document Audit")
-        st.markdown(text)
+        st.markdown(clean_text)
         st.caption("🔍 Precision Audit based on Source Documents")
-        
+
 def extract_key_findings(text):
-    """
-    Scans the AI's response for any bulleted lists to extract universal insights,
-    whether they are financial figures, story plots, or physics equations.
-    """
-    # This regex looks for lines starting with a bullet point (•, -, or *)
+    """Extracts bullets and cleans math for the insights expander."""
     bullet_pattern = r"(?:^|\n)\s*[\*•\-]\s*(.*)"
-    
     findings = re.findall(bullet_pattern, text)
     
     if findings:
-        # Remove duplicates and empty strings
+        unique_findings = list(dict.fromkeys([f.strip() for f in findings if f.strip()]))
+        with st.expander("📝 OneSwifty: Key Insights & Highlights", expanded=True):
+            for point in unique_findings[:5]: 
+                cleaned_point = clean_math_formatting(point)
+                # If the math is a big block, don't put a bullet in front of it
+                if cleaned_point.startswith("$$"):
+                    st.markdown(cleaned_point)
+                else:
+                    st.markdown(f"**•** {cleaned_point}")
+
+def render_document_audit(text):
+    # Pass it through the cleaner one last time to be safe
+    text = clean_math_formatting(text)
+    
+    with st.container(border=True):
+        st.markdown("### 📑 OneSwifty Document Audit")
+        # Use st.write or st.markdown; both handle KaTeX well if delimiters are clean
+        st.markdown(text)
+        st.caption("🔍 Precision Audit based on Source Documents")
+
+def extract_key_findings(text):
+    """
+    Scans the AI's response for any bulleted lists and cleans them 
+    using the master math scrubber before rendering.
+    """
+    # 1. Capture lines starting with bullets
+    bullet_pattern = r"(?:^|\n)\s*[\*•\-]\s*(.*)"
+    findings = re.findall(bullet_pattern, text)
+    
+    if findings:
+        # 2. Remove duplicates while preserving order
         unique_findings = list(dict.fromkeys([f.strip() for f in findings if f.strip()]))
         
         with st.expander("📝 OneSwifty: Key Insights & Highlights", expanded=True):
-            for point in unique_findings[:5]: # Show up to 5 key points
-                st.markdown(f"**•** {point}")
+            for point in unique_findings[:5]: 
+                # 3. Clean the math for each point
+                cleaned_point = clean_math_formatting(point)
+                
+                # 4. UI FIX: If the cleaned point starts with $$ (block math),
+                # we don't put a bullet in front of it to avoid rendering glitches.
+                if cleaned_point.startswith("$$"):
+                    st.markdown(cleaned_point)
+                else:
+                    st.markdown(f"**•** {cleaned_point}")
 
 
 
@@ -286,8 +329,11 @@ Every factual statement MUST be cited using the format: 'As seen on Page [X] in 
 FORMATTING RULE:
 Always include a brief bulleted list (using standard • bullets) summarizing the 3-4 most critical points of your answer, regardless of the topic (finance, literature, or science).
 
-MATH & FORMULA RULE (If Applicable):
-If the text contains physics or math, you MUST extract the actual mathematical symbols (e.g., $$ \mu_{NL} $$). Wrap them strictly in double dollar signs ($$).
+MATH & FORMULA RULE (STRICT):
+- Every mathematical variable or Greek letter MUST be wrapped in single dollar signs (e.g., $\delta_{min}(z)$ or $f_{MG}(z)$).
+- Every standalone equation or fraction MUST be on its own line and wrapped in double dollar signs (e.g., $$\delta_{min}(z) = \max(-1, ...)$$).
+- NEVER use raw text for math like "delta_{min}". 
+- Use standard LaTeX backslashes for Greek letters (e.g., \delta instead of delta).
 
 FINANCIAL RULES (If Applicable):
 When asked for a category total, look specifically for a line that contains the word 'Total'. Convert millions to Billions where appropriate for readability.
@@ -308,8 +354,8 @@ When asked for a category total, look specifically for a line that contains the 
                                 st.warning(f"⚠️ **Low Confidence Match ({best_score*100:.1f}%)**")
                             
                             # CLEAN THE ENTIRE ANSWER FIRST
-                            scrubbed_answer = clean_math_formatting(final_answer)
                             
+                            scrubbed_answer = clean_math_formatting(final_answer)
                             # Then pass the perfectly clean text to your UI functions
                             extract_key_findings(scrubbed_answer)
                             render_document_audit(scrubbed_answer)
