@@ -131,6 +131,7 @@ with st.container():
                     try:
                         res_text = meta_response.choices[0].message.content
                         auto_title, auto_author, auto_category = res_text.split("|")
+                        auto_title, auto_author, auto_category = auto_title.strip(), auto_author.strip(), auto_category.strip()
                     except:
                         auto_title, auto_author, auto_category = uploaded_file.name, "Unknown", "General"
                 
@@ -220,10 +221,6 @@ def ender_scientific_audit(text):
         st.markdown("### 🔬 OneSwifty Scientific Audit: MG vs GR")
         st.markdown(text)
         st.caption("🔍 Precision Audit based on Moretti et al. (2023)")
-        
-        
-
-        
 
 def extract_key_findings(text):
     """
@@ -281,8 +278,11 @@ else:
                             messages=[
                                 {
                                     "role": "system", 
-                                    "content": r"""You are OneSwifty AI, a high-precision Scientific Auditor. 
-            
+                                    messages=[{"role": "system", "content": """You are OneSwifty AI, a Scientific and Financial Auditor. 
+                                    MANDATORY CITATION: Every fact MUST cite: 'As seen on Page [X] in [Title] by [Author]...'
+                                    RULES:
+                                    1. HIERARCHY: For financial totals, look for explicit 'Total' lines.
+                                    2. VERIFICATION: Compare sub-items against reported totals.
                                     CRITICAL FORMATTING RULES:
                                     1. STANDALONE MATH: Use double dollar signs for equations: $$ [Formula] $$
                                     2. LATEX ONLY: Never use Unicode Greek characters (μ, δ). Always use $\mu$, $\delta$.
