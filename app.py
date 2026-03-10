@@ -350,7 +350,7 @@ When asked for a category total, look specifically for a line that contains the 
                         with st.chat_message("assistant"):
                             st.markdown(f"**Confidence Score:** `{best_score*100:.2f}%`")
                             
-                            if best_score < 0.60:
+                            if best_score < 0.50:
                                 st.warning(f"⚠️ **Low Confidence Match ({best_score*100:.1f}%)**")
                             
                             # CLEAN THE ENTIRE ANSWER FIRST
