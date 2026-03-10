@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 from openai import OpenAI
 from dotenv import load_dotenv
 from pgvector.psycopg import register_vector
+import re
 
 # Load environment variables
 load_dotenv()
@@ -92,6 +93,7 @@ def log_query(query, answer, confidence):
             answer, 
             f"{confidence*100:.2f}%"
         ])
+
 # --- MAIN INTERFACE ---
 st.title("🚀 OneSwifty: Universal Knowledge Engine[Testing]")
 
@@ -114,7 +116,7 @@ if current_spend >= (DAILY_BUDGET_LIMIT * ALERT_THRESHOLD) and not is_over_budge
         st.session_state.alert_sent = True
     st.warning(f"⚠️ Budget Warning: You have used ${current_spend:.2f} (80% of limit).")
 
-# --- STEP 1: INGESTION (RETORED PRECISION) ---
+# --- STEP 1: INGESTION ---
 with st.container():
     with st.expander("📥 Step 1: Ingest New Knowledge", expanded=not is_over_budget):
         uploaded_file = st.file_uploader("Upload PDF", type="pdf", label_visibility="collapsed")
@@ -140,7 +142,6 @@ with st.container():
                 except ValueError:
                     auto_title, auto_author, auto_category = uploaded_file.name, "Unknown", "General"
 
-                
                 conn = get_connection()
                 if conn:
                     with conn.cursor() as cur:
@@ -150,21 +151,20 @@ with st.container():
                             
                             text = page.get_text()
                             if text and len(text.strip()) > 20:
-                                # Clean NULL bytes to prevent psycopg errors
                                 clean_text = text.replace("\x00", "")
                                 chunk_size, overlap, start = 800, 80, 0
                                 while start < len(clean_text):
                                     end = min(start + chunk_size, len(clean_text))
                                     chunk = clean_text[start:end].strip()
                                     if len(chunk) > 20:
-                                clean_chunk = "".join(char for char in chunk if char != "\x00").strip()
-                                vec = get_embedding(clean_chunk)
-                                cur.execute("""
-                                    INSERT INTO oneswifty_knowledge 
-                                    (category, content_text, metadata_source, author, title, page_number, embedding)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                                """, (auto_category, clean_chunk, uploaded_file.name, auto_author, auto_title, i + 1, vec))
-                            start = end - overlap if (end - overlap) > start else end + 1
+                                        clean_chunk = "".join(char for char in chunk if char != "\x00").strip()
+                                        vec = get_embedding(clean_chunk)
+                                        cur.execute("""
+                                            INSERT INTO oneswifty_knowledge 
+                                            (category, content_text, metadata_source, author, title, page_number, embedding)
+                                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                        """, (auto_category, clean_chunk, uploaded_file.name, auto_author, auto_title, i + 1, vec))
+                                    start = end - overlap if (end - overlap) > start else end + 1
                         conn.commit()
                     st.success(f"✅ Ingested: {auto_title}")
                     conn.close()
@@ -187,16 +187,12 @@ if conn:
 
 st.divider()
 
-import re
-import streamlit as st
-
-def ender_scientific_audit(text):
-"""
-    Aggressively cleans Unicode artifacts and wraps math in LaTeX 
-    for a high-precision Auditor interface.
+# --- FORMATTING FUNCTIONS ---
+def render_document_audit(text):
     """
-    # 1. HARD STRIP: Replace known problematic Unicode with pure LaTeX
-    # This stops the 'μNL μNL' glitch at the source
+    Cleans Unicode artifacts and wraps math in LaTeX. 
+    Works seamlessly for stories (ignores it) or science (formats it).
+    """
     cleaning_map = {
         "μNL": r"$\mu_{NL}$",
         "μ": r"$\mu$",
@@ -210,53 +206,33 @@ def ender_scientific_audit(text):
     for key, value in cleaning_map.items():
         text = text.replace(key, value)
 
-    # 2. FIX PARENTHESES MATH: Catch ( \mu_NL ) and turn into $ \mu_NL $
     text = re.sub(r'\((?=\s?\\)(.*?)\)', r'$\1$', text)
-    # Ensure the subscript {NL} and {E} are always escaped correctly for KaTeX
     text = text.replace(r"\mu_{NL}", r"$\mu_{\text{NL}}$")
     text = text.replace(r"\delta E", r"$\delta_E$")
     text = text.replace(r"\delta_E", r"$\delta_E$")
+    text = text.replace("$$$", "$").replace("$$", "$") 
 
-    # 3. PREVENT TRIPLE-WRAPPING: If we ended up with $$...$$, fix it
-    text = text.replace("$$$", "$").replace("$$", "$") # Ensure single $ for inline
-    # But restore double $$ for standalone blocks if they were intended
-    # (Optional: only if you expect large formulas)
-
-    # 4. FINAL RENDER IN A STYLED BOX
-    # Add a CSS-styled border for that 'OneSwifty' branding
     with st.container(border=True):
-        st.markdown("### 🔬 OneSwifty Scientific Audit")
-        st.markdown("### 🔬 OneSwifty Scientific Audit: MG vs GR")
+        st.markdown("### 📑 OneSwifty Document Audit")
         st.markdown(text)
-        st.caption("🔍 Precision Audit based on Moretti et al. (2023)")
+        st.caption("🔍 Precision Audit based on Source Documents")
 
 def extract_key_findings(text):
     """
-    Scans the high-precision audit for key physical constraints 
-    to create a 'Quick Audit' summary for the user.
+    Scans the AI's response for any bulleted lists to extract universal insights,
+    whether they are financial figures, story plots, or physics equations.
     """
-    # Updated triggers to match our LaTeX-heavy answers
-    triggers = [
-        r".*?stronger effective gravity.*?\.",
-        r".*?\\mu_{NL} > 1.*?\.",           # Updated for LaTeX
-        r".*?sub-?percent level.*?\.",
-        r".*?deeper voids.*?\.",
-        r".*?initial conditions.*?\.",
-        r".*?\\delta_E.*?\."                # Updated for density contrast
-    ]
+    # This regex looks for lines starting with a bullet point (•, -, or *)
+    bullet_pattern = r"(?:^|\n)\s*[\*•\-]\s*(.*)"
     
-    findings = []
-    for pattern in triggers:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            # Cleaning the bullet point: Remove parentheses the LLM likes to add
-            clean_bullet = match.group(0).strip().replace("(", "").replace(")", "")
-            findings.append(clean_bullet)
+    findings = re.findall(bullet_pattern, text)
     
     if findings:
-        # Use a distinctive 'OneSwifty' style for the summary
-        with st.expander("📝 OneSwifty: Key Physical Findings", expanded=True):
-            for point in findings[:4]:
+        # Remove duplicates and empty strings
+        unique_findings = list(dict.fromkeys([f.strip() for f in findings if f.strip()]))
+        
+        with st.expander("📝 OneSwifty: Key Insights & Highlights", expanded=True):
+            for point in unique_findings[:5]: # Show up to 5 key points
                 st.markdown(f"**•** {point}")
                 
 # --- STEP 3: SEARCH  ---
@@ -266,72 +242,69 @@ else:
     st.subheader("🔍 Step 3: Intelligent Search")
     query = st.chat_input("Ask about MG vs GR hierarchy...")
     
-   if query:
-    st.chat_message("user").write(query)
-    with st.spinner("Synthesizing context from across document pages..."):
-        query_vec = get_embedding(query)
-        conn = get_connection()
-        if conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT category, content_text, title, 1 - (embedding <=> %s::vector) AS similarity, author, page_number
-                    FROM oneswifty_knowledge 
-                    ORDER BY similarity DESC LIMIT 5
-                """, (query_vec,))
-                results = cur.fetchall()
-                
-                if results:
-                    context_text = "\n\n".join([f"TITLE: {res[2]} | AUTHORS: {res[4]} | PAGE: {res[5]} | CONTENT: {res[1]}" for res in results])
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {
-                                "role": "system", 
-"content": """You are OneSwifty AI, a high-precision Scientific and Financial Auditor. 
+    if query:
+        st.chat_message("user").write(query)
+        with st.spinner("Synthesizing context from across document pages..."):
+            query_vec = get_embedding(query)
+            conn = get_connection()
+            if conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT category, content_text, title, 1 - (embedding <=> %s::vector) AS similarity, author, page_number
+                        FROM oneswifty_knowledge 
+                        ORDER BY similarity DESC LIMIT 10
+                    """, (query_vec,))
+                    results = cur.fetchall()
+                    
+                    if results:
+                        context_text = "\n\n".join([f"TITLE: {res[2]} | AUTHORS: {res[4]} | PAGE: {res[5]} | CONTENT: {res[1]}" for res in results])
+                        response = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[
+                                {
+                                    "role": "system", 
+                                    "content": """You are OneSwifty AI, a Universal Knowledge Engine and high-precision Auditor. 
 
 MANDATORY CITATION RULE:
-Every factual statement MUST be cited using the format: 
-'As seen on Page [X] in [Full Paper Title] by [Primary Author] et al...'
+Every factual statement MUST be cited using the format: 'As seen on Page [X] in [Full Paper Title] by [Primary Author]...'
 
-FINANCIAL & TABLE AUDIT RULES:
-1. HIERARCHY: When asked for a category total, do NOT grab the first number you see. Look specifically for a line that contains the word 'Total' (e.g., 'Insurance and other financial reserves Total').
-2. VERIFICATION: If you list sub-items, verify their sum against the reported 'Total' line in the context. If they differ, state that you are reporting the explicit 'Total' line from the document.
-3. CURRENCY: All figures in the Budget documents are in MILLIONS of dollars unless otherwise stated. Convert $788,871 to $788.9 Billion in your final explanation for readability.
+FORMATTING RULE:
+Always include a brief bulleted list (using standard • bullets) summarizing the 3-4 most critical points of your answer, regardless of the topic (finance, literature, or science).
 
-MULTI-PAGE SYNTHESIS:
-1. Connect definitions (e.g., Page 11) to applications (e.g., Page 21) across different chunks.
+MATH & FORMULA RULE (If Applicable):
+If the text contains physics or math, you MUST extract the actual mathematical symbols (e.g., $$ \mu_{NL} $$). Wrap them strictly in double dollar signs ($$).
 
+FINANCIAL RULES (If Applicable):
+When asked for a category total, look specifically for a line that contains the word 'Total'. Convert millions to Billions where appropriate for readability.
 """
-                            },
-                            {"role": "user", "content": f"Context:\n{context_text}\n\nQuestion: {query}"}
-                        ]
-                    )
-                    final_answer = response.choices[0].message.content
-                    best_score = results[0][3]
-                    avg_score = sum([res[3] for res in results]) / len(results)
-                    log_query(query, final_answer, avg_score)
+                                },
+                                {"role": "user", "content": f"Context:\n{context_text}\n\nQuestion: {query}"}
+                            ]
+                        )
+                        final_answer = response.choices[0].message.content
+                        best_score = results[0][3]
+                        avg_score = sum([res[3] for res in results]) / len(results)
+                        log_query(query, final_answer, avg_score)
 
-                    with st.chat_message("assistant"):
-                        if best_score < 0.59:
-                            st.warning(f"⚠️ **Low Confidence Match ({best_score*100:.1f}%)**")
-                        
-                        if "$$" in final_answer:
-                            parts = final_answer.split("$$")
-                            for i, part in enumerate(parts):
-                                if i % 2 == 1: st.success("📝 **Technical Formula Found:**"); st.latex(part.strip())
-                                else: st.markdown(part)
-                        else:
-                            st.markdown(final_answer)
-                        log_query(query, answer, 0.9, resp.usage.prompt_tokens, resp.usage.completion_tokens)
-                        with st.expander("🔍 Scientific Audit Logs"):
-                            st.write(f"**Primary Match Score:** {best_score*100:.2f}%")
-                            for res in results:
-                                st.caption(f"**Doc:** {res[2]} | **Page:** {res[5]} | **Relevance:** {res[3]*100:.1f}%")
-                else:
-                    st.error("No knowledge found.")
+                        with st.chat_message("assistant"):
+                            st.markdown(f"**Confidence Score:** `{best_score*100:.2f}%`")
+                            
+                            if best_score < 0.59:
+                                st.warning(f"⚠️ **Low Confidence Match ({best_score*100:.1f}%)**")
+                            
+                            # Use the newly renamed universal functions
+                            extract_key_findings(final_answer)
+                            render_document_audit(final_answer)
+                                
+                            with st.expander("🔍 Document Audit Logs"):
+                                st.write(f"**Primary Match Score:** {best_score*100:.2f}%")
+                                for res in results:
+                                    st.caption(f"**Doc:** {res[2]} | **Page:** {res[5]} | **Relevance:** {res[3]*100:.1f}%")
+                    else:
+                        st.error("No knowledge found.")
 
-                
-                conn.close()
+                    conn.close()
+
 # --- SIDEBAR ADMIN ---
 with st.sidebar:
     st.header("🔐 Admin Controls")
