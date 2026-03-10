@@ -193,8 +193,22 @@ def render_document_audit(text):
     Cleans Unicode artifacts and wraps math in LaTeX. 
     Works seamlessly for stories (ignores it) or science (formats it).
     """
+    # 1. NORMALIZE UNICODE: Swap weird Unicode minus signs for standard hyphens
+    text = text.replace("−", "-")
+    
+    # 2. TARGETED CLEANUP: Catch the specific duplicated text glitches the LLM generated
+    text = text.replace("δmin⁡(z) δmin ​(z)", r"$\delta_{\text{min}}(z)$")
+    text = text.replace("δmin⁡(z)", r"$\delta_{\text{min}}(z)$")
+    
+    text = text.replace("fMG(z) fMG ​(z)", r"$f_{\text{MG}}(z)$")
+    text = text.replace("fMG(z)", r"$f_{\text{MG}}(z)$")
+    
+    text = text.replace(r"\delta_E=-1 =-1", r"$\delta_E = -1$")
+    
+    # 3. GENERAL CLEANING MAP: Catch standard variables
     cleaning_map = {
         "μNL": r"$\mu_{NL}$",
+        "μL": r"$\mu_L$", # Added this to catch the other coupling variable!
         "μ": r"$\mu$",
         "δE": r"$\delta_E$",
         "δ": r"$\delta$",
@@ -206,6 +220,7 @@ def render_document_audit(text):
     for key, value in cleaning_map.items():
         text = text.replace(key, value)
 
+    # 4. FINAL FORMATTING
     text = re.sub(r'\((?=\s?\\)(.*?)\)', r'$\1$', text)
     text = text.replace(r"\mu_{NL}", r"$\mu_{\text{NL}}$")
     text = text.replace(r"\delta E", r"$\delta_E$")
