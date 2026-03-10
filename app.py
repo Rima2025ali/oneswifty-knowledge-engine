@@ -251,82 +251,69 @@ def extract_key_findings(text):
             for point in findings[:4]:
                 st.markdown(f"**•** {point}")
                 
-# --- STEP 3: SEARCH (FORCE LaTeX & SOURCE MAP) ---
+# --- STEP 3: SEARCH  ---
 if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
 else:
     st.subheader("🔍 Step 3: Intelligent Search")
     query = st.chat_input("Ask about MG vs GR hierarchy...")
     
-    if query:
-        st.chat_message("user").write(query)
-        with st.spinner("Analyzing gravitational couplings..."):
-            query_vec = get_embedding(query)
-            conn = get_connection()
-            if conn:
-                with conn.cursor() as cur:
-                    cur.execute("""SELECT content_text, title, 1 - (embedding <=> %s::vector) AS sim, page_number 
-                                FROM oneswifty_knowledge ORDER BY sim DESC LIMIT 5""", (query_vec,))
-                    results = cur.fetchall()
-                    
-                    if results:
-                        # Fixed: consolidated context string
-                        context = "\n\n".join([f"DOC: {r[1]} | PAGE: {r[3]} | CONTENT: {r[0]}" for r in results])
-                        
-                        resp = client.chat.completions.create(
-                            model="gpt-4o",
-                            messages=[
-                                {
-                                    "role": "system", 
-                                    messages=[{"role": "system", "content": """You are OneSwifty AI, a Scientific and Financial Auditor. 
-                                    MANDATORY CITATION: Every fact MUST cite: 'As seen on Page [X] in [Title] by [Author]...'
-                                    RULES:
-                                    1. HIERARCHY: For financial totals, look for explicit 'Total' lines.
-                                    2. VERIFICATION: Compare sub-items against reported totals.
-                                    CRITICAL FORMATTING RULES:
-                                    1. STANDALONE MATH: Use double dollar signs for equations: $$ [Formula] $$
-                                    2. LATEX ONLY: Never use Unicode Greek characters (μ, δ). Always use $\mu$, $\delta$.
-                                    3. NO BRACKETS: Never use \[ \] or \( \).
-                                    4. VAINSHTEIN: Correct form is $$(R_V/R)^3 = \frac{32\pi}{3} G \beta^2 \lambda^2 \bar{\rho}_m \delta_v$$
-                                    STRICT FORMATTING RULES:
-                                    1. INLINE MATH: You MUST use single dollar signs for all variables. 
-                                       - WRONG: (\mu_{NL}) or (delta_E)
-                                       - RIGHT: $\mu_{NL}$ or $\delta_E$
-                                    2. STANDALONE MATH: Use double dollar signs: $$ [Formula] $$
-                                    3. NO PARENTHESES FOR MATH: Never wrap LaTeX in standard brackets or parentheses.
-                                    4. SYMBOL ACCURACY: Ensure \mu_{NL} is used for non-linear coupling and \delta_E for overdensity.
-                                    """
-                                },
-                                {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
-                            ]
-                        )
-                        
-                        answer = resp.choices[0].message.content
-                        
-                        # --- TECHNICAL SUMMARY & SOURCE MAP ---
-                        if any(x in answer for x in ["Modified Gravity", "MG"]):
-                            st.info("### 🔬 Technical Summary: MG Hierarchy & Coupling")
-                            st.latex(r"max_{0\le z\le z_{in}}f_{MG}(z)>1")
-                            st.markdown("""
-                            **Hierarchy of Effects:**
-                            * **Parameter Impact:** Increasing $\\alpha_{B0}$ or $m$ strengthens effective gravity.
-                            * **Evolution Efficiency:** MG progresses faster, requiring smaller ICs for fixed $\\delta_E$.
-                            * **Void Scaling:** MG deviations are amplified in deeper voids.
-                            """)
-                            
-                            with st.expander("📍 Source Map: Cross-Document Evidence", expanded=False):
-                                source_data = pd.DataFrame(results, columns=["Text", "Document", "Similarity", "Page"])
-                                # Optional: Convert similarity to percentage for better UX
-                                source_data["Similarity"] = source_data["Similarity"].apply(lambda x: f"{x*100:.1f}%")
-                                st.table(source_data[["Document", "Page", "Similarity"]])
+   if query:
+    st.chat_message("user").write(query)
+    with st.spinner("Synthesizing context from across document pages..."):
+        query_vec = get_embedding(query)
+        conn = get_connection()
+        if conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT category, content_text, title, 1 - (embedding <=> %s::vector) AS similarity, author, page_number
+                    FROM oneswifty_knowledge 
+                    ORDER BY similarity DESC LIMIT 5
+                """, (query_vec,))
+                results = cur.fetchall()
+                
+                if results:
+                    context_text = "\n\n".join([f"TITLE: {res[2]} | AUTHORS: {res[4]} | PAGE: {res[5]} | CONTENT: {res[1]}" for res in results])
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {
+                                "role": "system", 
+"content": """You are OneSwifty AI, a high-precision Scientific and Financial Auditor. 
 
-                        with st.chat_message("assistant"):
-                        if answer:
+MANDATORY CITATION RULE:
+Every factual statement MUST be cited using the format: 
+'As seen on Page [X] in [Full Paper Title] by [Primary Author] et al...'
+
+FINANCIAL & TABLE AUDIT RULES:
+1. HIERARCHY: When asked for a category total, do NOT grab the first number you see. Look specifically for a line that contains the word 'Total' (e.g., 'Insurance and other financial reserves Total').
+2. VERIFICATION: If you list sub-items, verify their sum against the reported 'Total' line in the context. If they differ, state that you are reporting the explicit 'Total' line from the document.
+3. CURRENCY: All figures in the Budget documents are in MILLIONS of dollars unless otherwise stated. Convert $788,871 to $788.9 Billion in your final explanation for readability.
+
+MULTI-PAGE SYNTHESIS:
+1. Connect definitions (e.g., Page 11) to applications (e.g., Page 21) across different chunks.
+2. For Equation 3.22, provide the LaTeX: $$max_{0\\le z\\le z_{in}}f_{MG}(z)>1$$
+"""
+                            },
+                            {"role": "user", "content": f"Context:\n{context_text}\n\nQuestion: {query}"}
+                        ]
+                    )
+                    final_answer = response.choices[0].message.content
+                    best_score = results[0][3]
+                    avg_score = sum([res[3] for res in results]) / len(results)
+                    log_query(query, final_answer, avg_score)
+
+                    with st.chat_message("assistant"):
+                        if best_score < 0.59:
+                            st.warning(f"⚠️ **Low Confidence Match ({best_score*100:.1f}%)**")
                         
-                        extract_key_findings(answer) 
-                        # Then show the full detailed audit in the border box
-                        render_scientific_audit(answer)                        
-                        
+                        if "$$" in final_answer:
+                            parts = final_answer.split("$$")
+                            for i, part in enumerate(parts):
+                                if i % 2 == 1: st.success("📝 **Technical Formula Found:**"); st.latex(part.strip())
+                                else: st.markdown(part)
+                        else:
+                            st.markdown(final_answer)
                         log_query(query, answer, 0.9, resp.usage.prompt_tokens, resp.usage.completion_tokens)
                 conn.close()
 # --- SIDEBAR ADMIN ---
