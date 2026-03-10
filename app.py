@@ -188,35 +188,47 @@ if conn:
 st.divider()
 
 # --- FORMATTING FUNCTIONS ---
+
+def clean_math_formatting(text):
+   
+    """
+    Centralized scrubber to force strict Streamlit LaTeX formatting.
+    Catches AI hallucinations and brute-forces specific variables.
+    """
+    # 1. BRUTE FORCE: Catch the exact plain-text variables the AI keeps outputting
+    text = text.replace("fMG(z)", r"$f_{\text{MG}}(z)$")
+    text = text.replace("fMG(a)", r"$f_{\text{MG}}(a)$")
+    text = text.replace("δE", r"$\delta_E$")
+    text = text.replace("δmin(z)", r"$\delta_{\text{min}}(z)$")
+    
+    # 2. Fix AI using standard ( ) for math instead of $ $
+    text = re.sub(r'\(\s*(\\[a-zA-Z]+[^\)]*)\s*\)', r'$\1$', text)
+    
+    # 3. Fix AI using escaped brackets \( \) or \[ \]
+    text = re.sub(r'\\\((.*?)\\\)', r'$\1$', text)
+    text = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text)
+    
+    # 4. Fix unescaped brackets [ ]
+    text = text.replace(r"\[", "$$").replace(r"\]", "$$")
+    
+    return text
+
 def render_document_audit(text):
     """
-    Cleans Unicode artifacts and wraps math in LaTeX. 
-    Works seamlessly for stories (ignores it) or science (formats it).
+    Renders the document audit and strictly enforces KaTeX delimiters.
     """
-    cleaning_map = {
-        "μNL": r"$\mu_{NL}$",
-        "μ": r"$\mu$",
-        "δE": r"$\delta_E$",
-        "δ": r"$\delta$",
-        "α": r"$\alpha$",
-        "ρ": r"$\rho$",
-        "π": r"$\pi$"
-    }
+    # Force AI bracket math into Streamlit dollar-sign math
+    text = text.replace(r"\[", "$$").replace(r"\]", "$$")
+    text = text.replace(r"\(", "$").replace(r"\)", "$")
     
-    for key, value in cleaning_map.items():
-        text = text.replace(key, value)
-
-    text = re.sub(r'\((?=\s?\\)(.*?)\)', r'$\1$', text)
-    text = text.replace(r"\mu_{NL}", r"$\mu_{\text{NL}}$")
-    text = text.replace(r"\delta E", r"$\delta_E$")
-    text = text.replace(r"\delta_E", r"$\delta_E$")
-    text = text.replace("$$$", "$").replace("$$", "$") 
-
+    # Catch cases where the AI forgets the backslashes entirely on block equations
+    text = text.replace("\n[ ", "\n$$ ").replace(" ]\n", " $$\n")
+    
     with st.container(border=True):
         st.markdown("### 📑 OneSwifty Document Audit")
         st.markdown(text)
         st.caption("🔍 Precision Audit based on Source Documents")
-
+        
 def extract_key_findings(text):
     """
     Scans the AI's response for any bulleted lists to extract universal insights,
@@ -234,7 +246,10 @@ def extract_key_findings(text):
         with st.expander("📝 OneSwifty: Key Insights & Highlights", expanded=True):
             for point in unique_findings[:5]: # Show up to 5 key points
                 st.markdown(f"**•** {point}")
-                
+
+
+
+
 # --- STEP 3: SEARCH  ---
 if is_over_budget:
     st.error(f"🛑 Daily Budget Reached (${DAILY_BUDGET_LIMIT}). Search is disabled.")
@@ -289,12 +304,15 @@ When asked for a category total, look specifically for a line that contains the 
                         with st.chat_message("assistant"):
                             st.markdown(f"**Confidence Score:** `{best_score*100:.2f}%`")
                             
-                            if best_score < 0.50:
+                            if best_score < 0.60:
                                 st.warning(f"⚠️ **Low Confidence Match ({best_score*100:.1f}%)**")
                             
-                            # Use the newly renamed universal functions
-                            extract_key_findings(final_answer)
-                            render_document_audit(final_answer)
+                            # CLEAN THE ENTIRE ANSWER FIRST
+                            scrubbed_answer = clean_math_formatting(final_answer)
+                            
+                            # Then pass the perfectly clean text to your UI functions
+                            extract_key_findings(scrubbed_answer)
+                            render_document_audit(scrubbed_answer)
                                 
                             with st.expander("🔍 Document Audit Logs"):
                                 st.write(f"**Primary Match Score:** {best_score*100:.2f}%")
