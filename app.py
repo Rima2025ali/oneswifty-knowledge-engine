@@ -95,7 +95,7 @@ def log_query(query, answer, confidence):
         ])
 
 # --- MAIN INTERFACE ---
-st.title("🚀 OneSwifty: Universal Knowledge Engine[Testing]")
+st.title("🚀 OneSwifty: Universal Knowledge Engine[BETA]")
 
 # --- INSTRUCTIONS ---
 st.markdown("""
