@@ -336,7 +336,7 @@ MATH & FORMULA RULE (STRICT):
 - Use standard LaTeX backslashes for Greek letters (e.g., \delta instead of delta).
 
 FINANCIAL RULES (If Applicable):
-When asked for a category total, look specifically for a line that contains the word 'Total'. Convert millions to Billions where appropriate for readability.
+When asked for a category total, look specifically for a line that contains the word 'Total'. 
 """
                                 },
                                 {"role": "user", "content": f"Context:\n{context_text}\n\nQuestion: {query}"}
