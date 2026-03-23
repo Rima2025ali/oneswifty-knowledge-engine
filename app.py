@@ -102,7 +102,7 @@ st.markdown("""
 ### 📖 How to use OneSwifty:
 1. **Ingest Knowledge**: Use Step 1 to upload a PDF. AI auto-identifies the Title, Author, and Category.
 2. **Verify Library**: Check Step 2 to ensure your knowledge base is populated.
-3. **Search & Audit**: Use Step 3 to ask technical or financial questions with mandatory citations.
+3. **Search & Audit**: Use Step 3 to ask technical or financial questions.
 ---
 """)
 
